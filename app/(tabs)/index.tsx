@@ -1,48 +1,157 @@
-import { ScrollView, Text, View, TouchableOpacity } from "react-native";
+import { ScrollView, Text, View, FlatList, Pressable } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ScreenContainer } from '@/components/screen-container';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ProgressBar } from '@/components/ui/progress-bar';
+import { FAB } from '@/components/ui/fab';
+import { useTranslations } from '@/hooks/use-translations';
+import { useColors } from '@/hooks/use-colors';
+import { Project, ProjectStats } from '@/types';
+import { loadData, calculateProjectStats, initializeDemoData } from '@/lib/store';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
-import { ScreenContainer } from "@/components/screen-container";
+export default function DashboardScreen() {
+  const t = useTranslations();
+  const colors = useColors();
+  const router = useRouter();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
 
-/**
- * Home Screen - NativeWind Example
- *
- * This template uses NativeWind (Tailwind CSS for React Native).
- * You can use familiar Tailwind classes directly in className props.
- *
- * Key patterns:
- * - Use `className` instead of `style` for most styling
- * - Theme colors: use tokens directly (bg-background, text-foreground, bg-primary, etc.); no dark: prefix needed
- * - Responsive: standard Tailwind breakpoints work on web
- * - Custom colors defined in tailwind.config.js
- */
-export default function HomeScreen() {
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    try {
+      setLoading(true);
+      let data = await loadData();
+      if (data.length === 0) {
+        await initializeDemoData();
+        data = await loadData();
+      }
+      setProjects(data);
+    } catch (error) {
+      console.error('Error loading projects:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProjectPress = (projectId: string) => {
+    // TODO: Navigate to project details
+    console.log('Navigate to project:', projectId);
+  };
+
+  const renderProjectCard = ({ item }: { item: Project }) => {
+    const stats = calculateProjectStats(item);
+    const hasEvictions = item.addresses.some((addr) =>
+      addr.rooms.some((room) =>
+        room.spaces.some((space) => space.status === 'wypowiedzenie')
+      )
+    );
+    const hasConflicts = item.addresses.some((addr) =>
+      addr.rooms.some((room) =>
+        room.spaces.some((space) => space.status === 'conflict')
+      )
+    );
+    const hasOverdue = item.addresses.some((addr) =>
+      addr.rooms.some((room) =>
+        room.spaces.some((space) => space.status === 'overdue')
+      )
+    );
+
+    return (
+      <Pressable
+        onPress={() => handleProjectPress(item.id)}
+        style={({ pressed }) => ({
+          opacity: pressed ? 0.8 : 1,
+        })}
+      >
+        <Card className="p-4 mb-4">
+          <View className="gap-3">
+            {/* Header */}
+            <View className="flex-row justify-between items-start">
+              <Text className="text-lg font-bold text-foreground flex-1">{item.name}</Text>
+              <View className="bg-surfaceVariant rounded-full p-2">
+                <MaterialIcons name="apartment" size={24} color={colors.primary} />
+              </View>
+            </View>
+
+            {/* Occupancy */}
+            <View className="gap-1">
+              <View className="flex-row justify-between items-center">
+                <Text className="text-3xl font-bold text-primary">{stats.occupancyPercent}%</Text>
+                <Text className="text-sm text-muted">
+                  {stats.occupied}/{stats.total} {t.addressList.occupied}
+                </Text>
+              </View>
+              <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />
+            </View>
+
+            {/* Badges */}
+            <View className="flex-row flex-wrap gap-2">
+              {hasEvictions && (
+                <Badge variant="warning" size="sm" label={`${t.roomDetails.eviction}`} />
+              )}
+              {hasConflicts && (
+                <Badge variant="error" size="sm" label={`${stats.conflict} ${t.statistics.conflictCount}`} />
+              )}
+              {hasOverdue && (
+                <Badge variant="error" size="sm" label={`${t.roomDetails.overdue}`} />
+              )}
+            </View>
+          </View>
+        </Card>
+      </Pressable>
+    );
+  };
+
   return (
-    <ScreenContainer className="p-6">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-1 gap-8">
-          {/* Hero Section */}
-          <View className="items-center gap-2">
-            <Text className="text-4xl font-bold text-foreground">Welcome</Text>
-            <Text className="text-base text-muted text-center">
-              Edit app/(tabs)/index.tsx to get started
-            </Text>
-          </View>
+    <ScreenContainer className="p-4">
+      {/* Header */}
+      <View className="flex-row justify-between items-center mb-6">
+        <Text className="text-2xl font-bold text-foreground">{t.dashboard.title}</Text>
+        <Pressable
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.7 : 1,
+          })}
+          className="bg-surfaceVariant rounded-full p-2"
+        >
+          <MaterialIcons name="person" size={24} color={colors.muted} />
+        </Pressable>
+      </View>
 
-          {/* Example Card */}
-          <View className="w-full max-w-sm self-center bg-surface rounded-2xl p-6 shadow-sm border border-border">
-            <Text className="text-lg font-semibold text-foreground mb-2">NativeWind Ready</Text>
-            <Text className="text-sm text-muted leading-relaxed">
-              Use Tailwind CSS classes directly in your React Native components.
-            </Text>
-          </View>
+      {/* Search Bar */}
+      <Pressable
+        className="bg-surfaceVariant rounded-full px-4 py-3 mb-6 flex-row items-center gap-2"
+      >
+        <MaterialIcons name="search" size={20} color={colors.muted} />
+        <Text className="text-muted">{t.dashboard.searchPlaceholder}</Text>
+      </Pressable>
 
-          {/* Example Button */}
-          <View className="items-center">
-            <TouchableOpacity className="bg-primary px-6 py-3 rounded-full active:opacity-80">
-              <Text className="text-background font-semibold">Get Started</Text>
-            </TouchableOpacity>
-          </View>
+      {/* Projects List */}
+      {loading ? (
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-muted">{t.common.loading}</Text>
         </View>
-      </ScrollView>
+      ) : projects.length === 0 ? (
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-muted">{t.messages.emptyProject}</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={projects}
+          renderItem={renderProjectCard}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+          contentContainerStyle={{ paddingBottom: 80 }}
+        />
+      )}
+
+      {/* FAB */}
+      <FAB icon="add" onPress={() => console.log('Add project')} />
     </ScreenContainer>
   );
 }

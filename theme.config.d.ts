@@ -2,12 +2,16 @@ export const themeColors: {
   primary: { light: string; dark: string };
   background: { light: string; dark: string };
   surface: { light: string; dark: string };
+  surfaceVariant: { light: string; dark: string };
   foreground: { light: string; dark: string };
   muted: { light: string; dark: string };
   border: { light: string; dark: string };
   success: { light: string; dark: string };
   warning: { light: string; dark: string };
   error: { light: string; dark: string };
+  occupied: { light: string; dark: string };
+  card: { light: string; dark: string };
+  cardHover: { light: string; dark: string };
 };
 
 declare const themeConfig: {

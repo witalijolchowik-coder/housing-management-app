@@ -1,14 +1,31 @@
 /** @type {const} */
 const themeColors = {
-  primary: { light: '#0a7ea4', dark: '#0a7ea4' },
-  background: { light: '#ffffff', dark: '#151718' },
-  surface: { light: '#f5f5f5', dark: '#1e2022' },
-  foreground: { light: '#11181C', dark: '#ECEDEE' },
-  muted: { light: '#687076', dark: '#9BA1A6' },
-  border: { light: '#E5E7EB', dark: '#334155' },
-  success: { light: '#22C55E', dark: '#4ADE80' },
-  warning: { light: '#F59E0B', dark: '#FBBF24' },
-  error: { light: '#EF4444', dark: '#F87171' },
+  // Primary accent - blue for toggles, active states
+  primary: { light: '#6C8EEF', dark: '#6C8EEF' },
+  
+  // Backgrounds
+  background: { light: '#121212', dark: '#121212' },
+  surface: { light: '#1E1E2E', dark: '#1E1E2E' },
+  surfaceVariant: { light: '#2A2A3A', dark: '#2A2A3A' },
+  
+  // Text colors
+  foreground: { light: '#E8E8E8', dark: '#E8E8E8' },
+  muted: { light: '#9BA1A6', dark: '#9BA1A6' },
+  
+  // Border
+  border: { light: '#334155', dark: '#334155' },
+  
+  // Status colors
+  success: { light: '#4ADE80', dark: '#4ADE80' },  // Free/Vacant - green
+  warning: { light: '#FBBF24', dark: '#FBBF24' },  // Wypowiedzenie - yellow/orange
+  error: { light: '#F87171', dark: '#F87171' },    // Conflict/Overdue - red
+  
+  // Additional status
+  occupied: { light: '#6C8EEF', dark: '#6C8EEF' }, // Occupied - blue
+  
+  // Card backgrounds
+  card: { light: '#1E1E2E', dark: '#1E1E2E' },
+  cardHover: { light: '#252535', dark: '#252535' },
 };
 
 module.exports = { themeColors };
