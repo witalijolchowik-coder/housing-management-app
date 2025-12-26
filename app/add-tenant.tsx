@@ -114,11 +114,6 @@ export default function AddTenantScreen() {
                 selected={gender === 'female'}
                 onPress={() => setGender('female')}
               />
-              <Chip
-                label={t.resident.other}
-                selected={gender === 'other'}
-                onPress={() => setGender('other')}
-              />
             </View>
           </View>
 

@@ -69,9 +69,6 @@ export default function RoomDetailsScreen() {
         return colors.occupied;
       case 'wypowiedzenie':
         return colors.warning;
-      case 'conflict':
-      case 'overdue':
-        return colors.error;
       default:
         return colors.muted;
     }
@@ -108,24 +105,6 @@ export default function RoomDetailsScreen() {
         };
       }
 
-      if (item.status === 'conflict') {
-        return {
-          title: `KONFLIKT: ${item.tenant?.firstName || ''}`,
-          subtitle: t.roomDetails.conflict,
-          badge: 'error',
-        };
-      }
-
-      if (item.status === 'overdue') {
-        return {
-          title: item.tenant
-            ? `${item.tenant.firstName} ${item.tenant.lastName}`
-            : t.roomDetails.vacant,
-          subtitle: t.roomDetails.overdue,
-          badge: 'error',
-        };
-      }
-
       return {
         title: t.common.loading,
         subtitle: '',
@@ -152,11 +131,7 @@ export default function RoomDetailsScreen() {
             <ProgressBar progress={content.progressValue || 0} color="bg-warning" />
           )}
 
-          {item.status === 'conflict' && (
-            <Pressable className="bg-error rounded-lg px-4 py-2 items-center">
-              <Text className="text-foreground font-semibold text-sm">{t.roomDetails.checkout}</Text>
-            </Pressable>
-          )}
+
         </View>
       </Card>
     );
@@ -174,7 +149,7 @@ export default function RoomDetailsScreen() {
         </Pressable>
         <View className="flex-1">
           <Text className="text-2xl font-bold text-foreground">
-            {t.roomDetails.title} {room.number}
+            {t.roomDetails.title} {room.name}
           </Text>
           <Text className="text-sm text-muted mt-1">{roomTypeLabel[room.type]}</Text>
         </View>

@@ -113,7 +113,7 @@ export default function AddressDetailsScreen() {
             <View className="flex-row justify-between items-start">
               <View>
                 <Text className="text-lg font-bold text-foreground">
-                  {t.roomDetails.title} {item.number}
+                  {t.roomDetails.title} {item.name}
                 </Text>
                 <Badge
                   variant="info"
@@ -145,9 +145,7 @@ export default function AddressDetailsScreen() {
               </View>
             )}
 
-            {stats.conflict > 0 && (
-              <Badge variant="error" size="sm" label={`${stats.conflict} ${t.roomDetails.conflict}`} />
-            )}
+
           </View>
         </Card>
       </Pressable>

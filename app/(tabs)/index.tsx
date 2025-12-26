@@ -5,12 +5,15 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { FAB } from '@/components/ui/fab';
+import { ProjectMenuModal } from '@/components/project-menu-modal';
+import { ProjectFormModal } from '@/components/project-form-modal';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Project, ProjectStats } from '@/types';
-import { loadData, calculateProjectStats, initializeDemoData } from '@/lib/store';
+import { loadData, calculateProjectStats, initializeDemoData, addProject, updateProject, deleteProject } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 export default function DashboardScreen() {
   const t = useTranslations();
@@ -18,10 +21,16 @@ export default function DashboardScreen() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [formVisible, setFormVisible] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | undefined>();
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadProjects();
+    }, [])
+  );
 
   const loadProjects = async () => {
     try {
@@ -46,23 +55,48 @@ export default function DashboardScreen() {
     });
   };
 
+  const handleProjectMenu = (project: Project) => {
+    setSelectedProject(project);
+    setMenuVisible(true);
+  };
+
+  const handleEditProject = () => {
+    if (selectedProject) {
+      setEditingProject(selectedProject);
+      setFormVisible(true);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (selectedProject) {
+      try {
+        await deleteProject(selectedProject.id);
+        await loadProjects();
+      } catch (error) {
+        console.error('Error deleting project:', error);
+      }
+    }
+  };
+
+  const handleSaveProject = async (name: string, city?: string) => {
+    try {
+      if (editingProject) {
+        await updateProject(editingProject.id, { name, city });
+      } else {
+        await addProject(name, city);
+      }
+      setEditingProject(undefined);
+      await loadProjects();
+    } catch (error) {
+      console.error('Error saving project:', error);
+      throw error;
+    }
+  };
+
   const renderProjectCard = ({ item }: { item: Project }) => {
     const stats = calculateProjectStats(item);
-    const hasEvictions = item.addresses.some((addr) =>
-      addr.rooms.some((room) =>
-        room.spaces.some((space) => space.status === 'wypowiedzenie')
-      )
-    );
-    const hasConflicts = item.addresses.some((addr) =>
-      addr.rooms.some((room) =>
-        room.spaces.some((space) => space.status === 'conflict')
-      )
-    );
-    const hasOverdue = item.addresses.some((addr) =>
-      addr.rooms.some((room) =>
-        room.spaces.some((space) => space.status === 'overdue')
-      )
-    );
+    const hasEvictions = stats.wypowiedzenie > 0;
+    const hasConflicts = stats.conflictCount > 0;
 
     return (
       <Pressable
@@ -75,10 +109,18 @@ export default function DashboardScreen() {
           <View className="gap-3">
             {/* Header */}
             <View className="flex-row justify-between items-start">
-              <Text className="text-lg font-bold text-foreground flex-1">{item.name}</Text>
-              <View className="bg-surfaceVariant rounded-full p-2">
-                <MaterialIcons name="apartment" size={24} color={colors.primary} />
+              <View className="flex-1">
+                <Text className="text-lg font-bold text-foreground">{item.name}</Text>
+                {item.city && (
+                  <Text className="text-sm text-muted mt-1">{item.city}</Text>
+                )}
               </View>
+              <Pressable
+                onPress={() => handleProjectMenu(item)}
+                className="bg-surfaceVariant rounded-full p-2"
+              >
+                <MaterialIcons name="more-vert" size={20} color={colors.muted} />
+              </Pressable>
             </View>
 
             {/* Occupancy */}
@@ -95,13 +137,10 @@ export default function DashboardScreen() {
             {/* Badges */}
             <View className="flex-row flex-wrap gap-2">
               {hasEvictions && (
-                <Badge variant="warning" size="sm" label={`${t.roomDetails.eviction}`} />
+                <Badge variant="warning" size="sm" label={`${stats.wypowiedzenie} ${t.roomDetails.eviction}`} />
               )}
               {hasConflicts && (
-                <Badge variant="error" size="sm" label={`${stats.conflict} ${t.statistics.conflictCount}`} />
-              )}
-              {hasOverdue && (
-                <Badge variant="error" size="sm" label={`${t.roomDetails.overdue}`} />
+                <Badge variant="error" size="sm" label={`${stats.conflictCount} ${t.statistics.conflictCount}`} />
               )}
             </View>
           </View>
@@ -125,14 +164,6 @@ export default function DashboardScreen() {
         </Pressable>
       </View>
 
-      {/* Search Bar */}
-      <Pressable
-        className="bg-surfaceVariant rounded-full px-4 py-3 mb-6 flex-row items-center gap-2"
-      >
-        <MaterialIcons name="search" size={20} color={colors.muted} />
-        <Text className="text-muted">{t.dashboard.searchPlaceholder}</Text>
-      </Pressable>
-
       {/* Projects List */}
       {loading ? (
         <View className="flex-1 items-center justify-center">
@@ -153,7 +184,32 @@ export default function DashboardScreen() {
       )}
 
       {/* FAB */}
-      <FAB icon="add" onPress={() => router.push('/address-list')} />
+      <FAB 
+        icon="add" 
+        onPress={() => {
+          setEditingProject(undefined);
+          setFormVisible(true);
+        }} 
+      />
+
+      {/* Modals */}
+      <ProjectMenuModal
+        visible={menuVisible}
+        projectName={selectedProject?.name || ''}
+        onClose={() => setMenuVisible(false)}
+        onEdit={handleEditProject}
+        onDelete={handleDeleteProject}
+      />
+
+      <ProjectFormModal
+        visible={formVisible}
+        project={editingProject}
+        onClose={() => {
+          setFormVisible(false);
+          setEditingProject(undefined);
+        }}
+        onSave={handleSaveProject}
+      />
     </ScreenContainer>
   );
 }
