@@ -23,6 +23,14 @@ export default function AddTenantScreen() {
   const [workStartDate, setWorkStartDate] = useState('');
   const [monthlyPrice, setMonthlyPrice] = useState('');
 
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
+
   const handleSubmit = async () => {
     if (!firstName || !lastName || !checkInDate || !monthlyPrice) {
       alert(t.messages.savingError);
@@ -30,7 +38,7 @@ export default function AddTenantScreen() {
     }
 
     try {
-      // TODO: Implement tenant check-in logic
+      // TODO: Implement tenant check-in logic with actual room/space selection
       console.log('Check-in tenant:', {
         firstName,
         lastName,
@@ -40,6 +48,7 @@ export default function AddTenantScreen() {
         workStartDate,
         monthlyPrice,
       });
+      alert(t.messages.saveSuccess);
       router.back();
     } catch (error) {
       console.error('Error checking in tenant:', error);
@@ -155,7 +164,7 @@ export default function AddTenantScreen() {
             })}
             className="bg-primary rounded-lg px-6 py-4 items-center mt-4"
           >
-            <Text className="text-foreground font-semibold text-base">{t.resident.checkIn}</Text>
+            <Text className="text-foreground font-semibold text-base">{t.common.save}</Text>
           </Pressable>
         </Card>
       </ScrollView>

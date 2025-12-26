@@ -40,8 +40,10 @@ export default function DashboardScreen() {
   };
 
   const handleProjectPress = (projectId: string) => {
-    // TODO: Navigate to project details
-    console.log('Navigate to project:', projectId);
+    router.push({
+      pathname: '/address-list',
+      params: { projectId },
+    });
   };
 
   const renderProjectCard = ({ item }: { item: Project }) => {
@@ -151,7 +153,7 @@ export default function DashboardScreen() {
       )}
 
       {/* FAB */}
-      <FAB icon="add" onPress={() => console.log('Add project')} />
+      <FAB icon="add" onPress={() => router.push('/address-list')} />
     </ScreenContainer>
   );
 }

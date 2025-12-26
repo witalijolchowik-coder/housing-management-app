@@ -10,6 +10,7 @@ import { useColors } from '@/hooks/use-colors';
 import { Room, Space } from '@/types';
 import { loadData, getDaysRemaining, isOverdue } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
+import { FAB } from '@/components/ui/fab';
 
 export default function RoomDetailsScreen() {
   const t = useTranslations();
@@ -180,7 +181,7 @@ export default function RoomDetailsScreen() {
       </View>
 
       {/* Spaces List */}
-      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
         {room.spaces.length === 0 ? (
           <View className="items-center justify-center py-8">
             <Text className="text-muted">{t.messages.emptyRoom}</Text>
@@ -194,6 +195,9 @@ export default function RoomDetailsScreen() {
           />
         )}
       </ScrollView>
+
+      {/* FAB */}
+      <FAB icon="add" onPress={() => router.push('/add-tenant')} />
     </ScreenContainer>
   );
 }

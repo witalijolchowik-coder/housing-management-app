@@ -50,7 +50,10 @@ export default function AddressListScreen() {
 
     return (
       <Pressable
-        onPress={() => console.log('Address details:', item.id)}
+        onPress={() => router.push({
+          pathname: '/address-details',
+          params: { projectId, addressId: item.id },
+        })}
         style={({ pressed }) => ({
           opacity: pressed ? 0.8 : 1,
         })}
@@ -153,7 +156,7 @@ export default function AddressListScreen() {
       )}
 
       {/* FAB */}
-      <FAB icon="add" onPress={() => console.log('Add address')} />
+      <FAB icon="add" onPress={() => router.push('/address-list')} />
     </ScreenContainer>
   );
 }

@@ -54,7 +54,10 @@ export default function AddressDetailsScreen() {
 
   const renderResidentCard = ({ item }: { item: Tenant }) => (
     <Pressable
-      onPress={() => console.log('Resident details:', item.id)}
+      onPress={() => router.push({
+        pathname: '/room-details',
+        params: { projectId, addressId, roomId: item.spaceId },
+      })}
       style={({ pressed }) => ({
         opacity: pressed ? 0.8 : 1,
       })}
@@ -97,7 +100,10 @@ export default function AddressDetailsScreen() {
 
     return (
       <Pressable
-        onPress={() => console.log('Room details:', item.id)}
+        onPress={() => router.push({
+          pathname: '/room-details',
+          params: { projectId, addressId, roomId: item.id },
+        })}
         style={({ pressed }) => ({
           opacity: pressed ? 0.8 : 1,
         })}
