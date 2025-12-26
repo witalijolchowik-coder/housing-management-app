@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK (Local)
 
 on:
   push:
@@ -27,6 +27,21 @@ jobs:
         uses: pnpm/action-setup@v2
         with:
           version: 9.12.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -36,37 +51,34 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
 
-      - name: Build APK with Expo Prebuild
+      - name: Setup Gradle cache
+        uses: gradle/gradle-build-action@v2
+
+      - name: Build APK with Expo
         run: |
-          npx expo@latest prebuild --clean --platform android --non-interactive
+          npx expo prebuild --clean --platform android
           cd android
-          chmod +x gradlew
           ./gradlew assembleRelease
+        env:
+          JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
 
-      - name: Upload APK Artifact
+      - name: Find and upload APK
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: housing-manager-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
+        if: always()
 
-      - name: Upload Build Logs on Failure
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: build-logs
-          path: |
-            android/build/
-            android/app/build/
-          retention-days: 7
-
-      - name: Create GitHub Release
+      - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
