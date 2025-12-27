@@ -73,6 +73,8 @@ export interface Room {
   };
 }
 
+export type OperatorType = 'rent_planet' | 'e_port' | 'other';
+
 export interface Address {
   id: string;
   projectId: string;
@@ -91,6 +93,8 @@ export interface Address {
   rooms: Room[];
   status?: 'active' | 'wypowiedzenie'; // Address-level status
   addressWypowiedzienieStart?: string; // When address was put on wypowiedzenie
+  operator?: OperatorType; // Operator: Rent Planet, E-Port, or Other
+  operatorName?: string; // Custom operator name if operator is 'other'
 }
 
 export interface Project {
@@ -155,6 +159,8 @@ export interface AddAddressFormData {
   totalCost: number;
   pricePerSpace: number;
   couplePrice?: number;
+  operator?: OperatorType;
+  operatorName?: string;
 }
 
 export interface AddProjectFormData {

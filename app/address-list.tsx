@@ -10,7 +10,7 @@ import { AddressMenuModal } from '@/components/address-menu-modal';
 import { AddressFormModal } from '@/components/address-form-modal';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Address, AddAddressFormData } from '@/types';
+import { Address, AddAddressFormData, OperatorType } from '@/types';
 import { loadData, calculateAddressStats, addAddress, updateAddress, deleteAddress, putAddressOnWypowiedzenie, removeAddressFromWypowiedzenie } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -132,10 +132,24 @@ export default function AddressListScreen() {
 
   const renderAddressCard = ({ item }: { item: Address }) => {
     const stats = calculateAddressStats(item);
-    const occupancyPercent = stats.total > 0 
-      ? Math.round(((stats.occupied + stats.wypowiedzenie) / stats.total) * 100)
-      : 0;
+    const occupancyPercent = stats.total > 0 ? Math.round((stats.occupied / stats.total) * 100) : 0;
     const hasEvictions = stats.wypowiedzenie > 0;
+    
+    // Count actual tenants (not spaces)
+    let tenantCount = 0;
+    for (const room of item.rooms) {
+      for (const space of room.spaces) {
+        if (space.tenant) tenantCount++;
+      }
+    }
+    
+    // Get operator name
+    const getOperatorName = () => {
+      if (item.operator === 'rent_planet') return 'Rent Planet';
+      if (item.operator === 'e_port') return 'E-Port';
+      if (item.operator === 'other' && item.operatorName) return item.operatorName;
+      return 'Brak operatora';
+    };
 
     return (
       <Pressable
@@ -163,9 +177,13 @@ export default function AddressListScreen() {
                   <Text className="text-lg font-bold text-foreground">{item.name}</Text>
                   <Text className="text-sm text-muted mt-2">{item.fullAddress}</Text>
                 </View>
-                <View className="flex-row gap-1">
-                  {item.coupleRooms > 0 && (
-                    <Badge variant="info" size="sm" label={`${item.coupleRooms} ♡`} />
+                <View className="flex-col gap-2">
+                  <View className="flex-row items-center gap-2">
+                    <MaterialIcons name="person" size={16} color={colors.success} />
+                    <Text className="text-sm font-semibold text-foreground">{tenantCount}</Text>
+                  </View>
+                  {item.operator && (
+                    <Badge variant="info" size="sm" label={getOperatorName()} />
                   )}
                   {item.status === 'wypowiedzenie' && (
                     <Badge variant="warning" size="sm" label="Wypowiedzenie" />

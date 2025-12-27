@@ -213,3 +213,12 @@
 - [x] Create occupied spaces detail screen (by Project → Address with counts)
 - [x] Add back navigation and visual hierarchy to detail screens
 - [x] Test all drill-down flows end-to-end (13 tests passing, 55 total tests)
+
+
+### Address Operator & Form Fixes
+- [x] Replace heart counter with tenant count + person icon on address cards
+- [x] Add operator field to Address type (Rent Planet, E-Port, Inny operator)
+- [x] Update add-address form with operator selection (radio buttons)
+- [x] Display operator tag on address cards under address name
+- [x] Fix form padding - prevent overlap with status bar and bottom navigation (pt-12 pb-20)
+- [x] Write and pass 20 tests for operator selection (75 total tests passing)

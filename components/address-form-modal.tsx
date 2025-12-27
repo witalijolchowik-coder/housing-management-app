@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useTranslations } from '@/hooks/use-translations';
-import { Address, AddAddressFormData } from '@/types';
+import { Address, AddAddressFormData, OperatorType } from '@/types';
 
 interface AddressFormModalProps {
   visible: boolean;
@@ -32,6 +32,8 @@ export function AddressFormModal({
     totalCost: 0,
     pricePerSpace: 0,
     couplePrice: 0,
+    operator: 'rent_planet',
+    operatorName: '',
   });
   const [loading, setLoading] = useState(false);
 
@@ -49,6 +51,8 @@ export function AddressFormModal({
         totalCost: address.totalCost,
         pricePerSpace: address.pricePerSpace,
         couplePrice: address.couplePrice || 0,
+        operator: address.operator || 'rent_planet',
+        operatorName: address.operatorName || '',
       });
     } else {
       setFormData({
@@ -63,6 +67,8 @@ export function AddressFormModal({
         totalCost: 0,
         pricePerSpace: 0,
         couplePrice: 0,
+        operator: 'rent_planet',
+        operatorName: '',
       });
     }
   }, [address, visible]);
@@ -92,7 +98,7 @@ export function AddressFormModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-background">
+      <View className="flex-1 bg-background pt-12 pb-20">
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 py-4 border-b border-border">
           <Pressable onPress={onClose}>
@@ -268,6 +274,83 @@ export function AddressFormModal({
             />
           </View>
 
+          {/* Operator */}
+          <View className="mb-4">
+            <Text className="text-sm font-semibold text-foreground mb-3">
+              Operator firmy *
+            </Text>
+            <View className="gap-2">
+              {/* Rent Planet */}
+              <Pressable
+                onPress={() => setFormData({ ...formData, operator: 'rent_planet' })}
+                className={`flex-row items-center p-3 rounded-lg border ${
+                  formData.operator === 'rent_planet'
+                    ? 'bg-primary/20 border-primary'
+                    : 'bg-surface border-border'
+                }`}
+              >
+                <View
+                  className={`w-5 h-5 rounded-full border-2 mr-3 ${
+                    formData.operator === 'rent_planet'
+                      ? 'bg-primary border-primary'
+                      : 'border-muted'
+                  }`}
+                />
+                <Text className="text-foreground font-medium">Rent Planet</Text>
+              </Pressable>
+
+              {/* E-Port */}
+              <Pressable
+                onPress={() => setFormData({ ...formData, operator: 'e_port' })}
+                className={`flex-row items-center p-3 rounded-lg border ${
+                  formData.operator === 'e_port'
+                    ? 'bg-primary/20 border-primary'
+                    : 'bg-surface border-border'
+                }`}
+              >
+                <View
+                  className={`w-5 h-5 rounded-full border-2 mr-3 ${
+                    formData.operator === 'e_port'
+                      ? 'bg-primary border-primary'
+                      : 'border-muted'
+                  }`}
+                />
+                <Text className="text-foreground font-medium">E-Port</Text>
+              </Pressable>
+
+              {/* Other Operator */}
+              <Pressable
+                onPress={() => setFormData({ ...formData, operator: 'other' })}
+                className={`flex-row items-center p-3 rounded-lg border ${
+                  formData.operator === 'other'
+                    ? 'bg-primary/20 border-primary'
+                    : 'bg-surface border-border'
+                }`}
+              >
+                <View
+                  className={`w-5 h-5 rounded-full border-2 mr-3 ${
+                    formData.operator === 'other'
+                      ? 'bg-primary border-primary'
+                      : 'border-muted'
+                  }`}
+                />
+                <Text className="text-foreground font-medium">Inny operator</Text>
+              </Pressable>
+
+              {/* Custom Operator Name */}
+              {formData.operator === 'other' && (
+                <TextInput
+                  value={formData.operatorName || ''}
+                  onChangeText={(text) => setFormData({ ...formData, operatorName: text })}
+                  placeholder="Nazwa operatora"
+                  placeholderTextColor={colors.muted}
+                  className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground mt-2"
+                  editable={!loading}
+                />
+              )}
+            </View>
+          </View>
+
           {/* Couple Price */}
           <View className="mb-4">
             <Text className="text-sm font-semibold text-foreground mb-2">
@@ -286,7 +369,7 @@ export function AddressFormModal({
         </ScrollView>
 
         {/* Save Button */}
-        <View className="border-t border-border p-4">
+        <View className="border-t border-border p-4 pb-8">
           <Pressable
             onPress={handleSave}
             disabled={loading}
