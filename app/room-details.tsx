@@ -167,16 +167,25 @@ export default function RoomDetailsScreen() {
       <View>
         <Card className="p-4 mb-3">
           <View className="gap-3">
+            {/* Header: Tenant name or "Wolne" with space badge and menu */}
             <View className="flex-row justify-between items-start">
-              <View className="flex-1">
-                <Text className="text-lg font-bold text-foreground">
-                  Miejsce {item.number}
-                </Text>
+              <View className="flex-1 gap-2">
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-lg font-bold text-foreground flex-1">
+                    {item.tenant ? `${item.tenant.firstName} ${item.tenant.lastName}` : 'Wolne'}
+                  </Text>
+                  <Badge
+                    variant="default"
+                    size="sm"
+                    label={`Miejsce ${item.number}`}
+                    className=""
+                  />
+                </View>
                 <Badge
                   variant={status.color === 'bg-success' ? 'success' : status.color === 'bg-warning' ? 'warning' : 'default'}
                   size="sm"
                   label={status.label}
-                  className="mt-2"
+                  className=""
                 />
               </View>
               <Pressable
@@ -190,11 +199,9 @@ export default function RoomDetailsScreen() {
               </Pressable>
             </View>
 
-            {item.tenant ? (
+            {/* Tenant details */}
+            {item.tenant && (
               <View className="gap-2 pt-2 border-t border-border">
-                <Text className="text-sm font-semibold text-foreground">
-                  {item.tenant.firstName} {item.tenant.lastName}
-                </Text>
                 <Text className="text-xs text-muted">
                   Zarezerwowane: {item.tenant.checkInDate}
                 </Text>
@@ -202,12 +209,9 @@ export default function RoomDetailsScreen() {
                   {item.tenant.monthlyPrice} zł/miesiąc
                 </Text>
               </View>
-            ) : (
-              <View className="gap-2 pt-2 border-t border-border">
-                <Text className="text-sm text-muted">Brak rezerwacji</Text>
-              </View>
             )}
 
+            {/* Eviction info */}
             {item.wypowiedzenie && (
               <View className="gap-2 pt-2 border-t border-border">
                 <View className="flex-row justify-between items-center">
@@ -229,12 +233,19 @@ export default function RoomDetailsScreen() {
   return (
     <ScreenContainer>
       {/* Header */}
-      <View className="flex-row items-center gap-2 mb-4">
+      <View className="flex-row items-center gap-3 mb-4">
         <Pressable onPress={() => router.back()} className="p-2">
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </Pressable>
         <View className="flex-1">
-          <Text className="text-2xl font-bold text-foreground">{t.roomDetails.title} {room.name}</Text>
+          <View className="flex-row items-center gap-2 mb-1">
+            <Text className="text-2xl font-bold text-foreground">{t.roomDetails.title} {room.name}</Text>
+            <View className="px-3 py-1.5 bg-primary rounded-full">
+              <Text className="text-lg text-background font-bold">
+                {room.type === 'male' ? '♂' : room.type === 'female' ? '♀' : '♡'}
+              </Text>
+            </View>
+          </View>
           <Text className="text-sm text-muted">{roomTypeLabel[room.type]}</Text>
         </View>
       </View>

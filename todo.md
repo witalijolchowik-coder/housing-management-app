@@ -327,3 +327,13 @@
 - [x] Fixed: space.status restored when removing eviction
 - [x] Conflict detection now works correctly: only triggers when endDate < today AND tenant exists
 - [x] All 124 tests passing
+
+
+### Room Details UI Redesign
+- [x] Enlarge gender icon in room header for better visibility (added in rounded badge)
+- [x] Reorganize space card hierarchy: tenant name as primary, space number as badge
+- [x] Update empty space display to show "Wolne" (Free) instead of name
+- [x] Make space number a tag/badge (secondary information)
+- [x] Test UI layout and readability
+- [x] Verify visual hierarchy is correct
+- [x] All 124 tests passing
