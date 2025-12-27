@@ -150,7 +150,7 @@ export default function SelectTenantScreen() {
       <Card className="p-4 mb-2 flex-row gap-3 items-center justify-between">
         <View className="flex-1 gap-1">
           <Text className="font-semibold text-foreground">
-            {item.firstName} {item.lastName}
+            {item.firstName} {item.lastName} <Text className="text-muted">({item.birthYear})</Text>
           </Text>
           <Text className="text-xs text-muted">
             {item.checkInDate}

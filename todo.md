@@ -499,3 +499,12 @@
 - [x] Ensure all calendar cells have fixed width and height
 - [x] Prevent flex-grow behavior on calendar cells
 - [x] Test with months that have 28, 29, 30, 31 days
+
+
+### Display Birth Year in Tenant Lists
+- [x] Add birth year (muted color) in address-details tenant list
+- [x] Add birth year (muted color) in select-tenant screen
+- [x] Add birth year (muted color) in room-details tenant list
+- [x] Add birth year (muted color) in search results
+- [x] Format: "Name Surname (1990)" with year in gray
+- [x] Helps distinguish tenants with same names and match roommates by age

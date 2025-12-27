@@ -225,7 +225,11 @@ export default function RoomDetailsScreen() {
               <View className="flex-1 gap-2">
                 <View className="flex-row items-center gap-2">
                   <Text className="text-lg font-bold text-foreground flex-1">
-                    {item.tenant ? `${item.tenant.firstName} ${item.tenant.lastName}` : 'Wolne'}
+                    {item.tenant ? (
+                      <>
+                        {item.tenant.firstName} {item.tenant.lastName} <Text className="text-muted">({item.tenant.birthYear})</Text>
+                      </>
+                    ) : 'Wolne'}
                   </Text>
                   <Badge
                     variant="default"

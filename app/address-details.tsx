@@ -158,7 +158,7 @@ export default function AddressDetailsScreen() {
           </View>
           <View className="flex-1 justify-center gap-1">
             <Text className="font-semibold text-foreground">
-              {item.firstName} {item.lastName}
+              {item.firstName} {item.lastName} <Text className="text-muted">({item.birthYear})</Text>
             </Text>
             <Text className="text-xs text-muted">{item.checkInDate}</Text>
           </View>

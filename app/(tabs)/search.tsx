@@ -160,7 +160,7 @@ export default function SearchScreen() {
           <View className="flex-row justify-between items-start">
             <View className="flex-1">
               <Text className="text-lg font-bold text-foreground">
-                {item.firstName} {item.lastName}
+                {item.firstName} {item.lastName} <Text className="text-muted">({item.birthYear})</Text>
               </Text>
               <Text className="text-sm text-muted mt-1">{item.projectName}</Text>
             </View>
@@ -191,7 +191,7 @@ export default function SearchScreen() {
             </Pressable>
             <View className="flex-1">
               <Text className="text-2xl font-bold text-foreground">
-                {selectedTenant.firstName} {selectedTenant.lastName}
+                {selectedTenant.firstName} {selectedTenant.lastName} <Text className="text-muted">({selectedTenant.birthYear})</Text>
               </Text>
               <Text className="text-sm text-muted mt-1">{selectedTenant.projectName}</Text>
             </View>
