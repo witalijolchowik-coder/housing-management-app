@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, FlatList, Pressable, Image } from 'react-native';
+import { ScrollView, Text, View, FlatList, Pressable, Image, Modal } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
@@ -8,7 +8,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Address, Room, Tenant } from '@/types';
-import { loadData, calculateRoomStats, getDaysRemaining } from '@/lib/store';
+import { loadData, calculateRoomStats, getDaysRemaining, saveData } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export default function AddressDetailsScreen() {
@@ -19,6 +19,10 @@ export default function AddressDetailsScreen() {
   const [address, setAddress] = useState<Address | null>(null);
   const [activeTab, setActiveTab] = useState<'residents' | 'rooms'>('residents');
   const [loading, setLoading] = useState(true);
+  const [tenantMenuVisible, setTenantMenuVisible] = useState(false);
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | undefined>(undefined);
+  const [roomMenuVisible, setRoomMenuVisible] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState<Room | undefined>(undefined);
 
   useEffect(() => {
     loadAddress();
@@ -26,7 +30,6 @@ export default function AddressDetailsScreen() {
 
   const loadAddress = async () => {
     try {
-      setLoading(true);
       const projects = await loadData();
       const project = projects.find((p) => p.id === projectId);
       if (project) {
@@ -44,46 +47,113 @@ export default function AddressDetailsScreen() {
 
   if (loading || !address) {
     return (
-      <ScreenContainer className="p-4">
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-muted">{t.common.loading}</Text>
-        </View>
+      <ScreenContainer>
+        <Text className="text-muted">{t.common.loading}</Text>
       </ScreenContainer>
     );
   }
 
+  const getRoomName = (spaceId: string | undefined): string => {
+    if (!spaceId) return 'Unknown';
+    for (const room of address?.rooms || []) {
+      const space = room.spaces.find((s) => s.id === spaceId);
+      if (space) {
+        return room.name;
+      }
+    }
+    return 'Unknown';
+  };
+
+  const handleDeleteTenant = async (tenant: Tenant) => {
+    if (!address) return;
+    try {
+      const projects = await loadData();
+      const project = projects.find((p) => p.id === projectId);
+      if (project) {
+        const addr = project.addresses.find((a) => a.id === addressId);
+        if (addr) {
+          for (const room of addr.rooms) {
+            const space = room.spaces.find((s) => s.id === tenant.spaceId);
+            if (space) {
+              space.tenant = null;
+            }
+          }
+          await saveData(projects);
+          await loadAddress();
+          setTenantMenuVisible(false);
+          setSelectedTenant(undefined);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting tenant:', error);
+    }
+  };
+
+  const handleDeleteRoom = async (room: Room) => {
+    if (!address) return;
+    try {
+      const projects = await loadData();
+      const project = projects.find((p) => p.id === projectId);
+      if (project) {
+        const addr = project.addresses.find((a) => a.id === addressId);
+        if (addr) {
+          addr.rooms = addr.rooms.filter((r) => r.id !== room.id);
+          await saveData(projects);
+          await loadAddress();
+          setRoomMenuVisible(false);
+          setSelectedRoom(undefined);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting room:', error);
+    }
+  };
+
   const renderResidentCard = ({ item }: { item: Tenant }) => (
-    <Pressable
-      onPress={() => router.push({
-        pathname: '/room-details',
-        params: { projectId, addressId, roomId: item.spaceId },
-      })}
-      style={({ pressed }) => ({
-        opacity: pressed ? 0.8 : 1,
-      })}
-    >
-      <Card className="p-4 mb-3 flex-row gap-3">
-        <View className="w-12 h-12 rounded-full bg-primary items-center justify-center">
-          {item.photo ? (
-            <Image source={{ uri: item.photo }} className="w-full h-full rounded-full" />
-          ) : (
-            <Text className="text-foreground font-bold">
-              {item.firstName.charAt(0)}{item.lastName.charAt(0)}
+    <View>
+      <Card className="p-4 mb-3 flex-row gap-3 justify-between items-center">
+        <Pressable
+          onPress={() => router.push({
+            pathname: '/room-details',
+            params: { projectId, addressId, roomId: item.spaceId },
+          })}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.8 : 1,
+            flex: 1,
+          })}
+          className="flex-row gap-3 flex-1"
+        >
+          <View className="w-12 h-12 rounded-full bg-primary items-center justify-center">
+            {item.photo ? (
+              <Image source={{ uri: item.photo }} className="w-full h-full rounded-full" />
+            ) : (
+              <Text className="text-foreground font-bold">
+                {item.firstName.charAt(0)}{item.lastName.charAt(0)}
+              </Text>
+            )}
+          </View>
+          <View className="flex-1 justify-center gap-1">
+            <Text className="font-semibold text-foreground">
+              {item.firstName} {item.lastName}
             </Text>
-          )}
-        </View>
-        <View className="flex-1 justify-center gap-1">
-          <Text className="font-semibold text-foreground">
-            {item.firstName} {item.lastName}
-          </Text>
-          <Text className="text-xs text-muted">{item.checkInDate}</Text>
-        </View>
-        <View className="justify-center items-end gap-1">
-          <Text className="text-sm font-semibold text-foreground">{item.monthlyPrice} zł</Text>
-          <Text className="text-xs text-muted">Pokój {item.spaceId}</Text>
-        </View>
+            <Text className="text-xs text-muted">{item.checkInDate}</Text>
+          </View>
+          <View className="justify-center items-end gap-1">
+            <Text className="text-sm font-semibold text-foreground">{item.monthlyPrice} zł</Text>
+            <Text className="text-xs text-muted">Pokój {getRoomName(item.spaceId)}</Text>
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            setSelectedTenant(item);
+            setTenantMenuVisible(true);
+          }}
+          className="p-2"
+        >
+          <MaterialIcons name="more-vert" size={20} color={colors.foreground} />
+        </Pressable>
       </Card>
-    </Pressable>
+    </View>
   );
 
   const renderRoomCard = ({ item }: { item: Room }) => {
@@ -99,56 +169,68 @@ export default function AddressDetailsScreen() {
     };
 
     return (
-      <Pressable
-        onPress={() => router.push({
-          pathname: '/room-details',
-          params: { projectId, addressId, roomId: item.id },
-        })}
-        style={({ pressed }) => ({
-          opacity: pressed ? 0.8 : 1,
-        })}
-      >
-        <Card className="p-4 mb-3">
-          <View className="gap-3">
-            <View className="flex-row justify-between items-start">
-              <View>
-                <Text className="text-lg font-bold text-foreground">
-                  {t.roomDetails.title} {item.name}
-                </Text>
-                <Badge
-                  variant="info"
-                  size="sm"
-                  label={roomTypeLabel[item.type]}
-                  className="mt-2"
-                />
+      <View>
+        <Pressable
+          onPress={() => router.push({
+            pathname: '/room-details',
+            params: { projectId, addressId, roomId: item.id },
+          })}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.8 : 1,
+          })}
+          className="flex-1"
+        >
+          <Card className="p-4 mb-3">
+            <View className="gap-3">
+              <View className="flex-row justify-between items-start">
+                <View className="flex-1">
+                  <Text className="text-lg font-bold text-foreground">
+                    {t.roomDetails.title} {item.name}
+                  </Text>
+                  <Badge
+                    variant="info"
+                    size="sm"
+                    label={roomTypeLabel[item.type]}
+                    className="mt-2"
+                  />
+                </View>
+                <View className="flex-row gap-2 items-center">
+                  <Text className="text-sm text-muted">
+                    {stats.occupied}/{stats.total}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setSelectedRoom(item);
+                      setRoomMenuVisible(true);
+                    }}
+                    className="p-2"
+                  >
+                    <MaterialIcons name="more-vert" size={20} color={colors.foreground} />
+                  </Pressable>
+                </View>
               </View>
-              <Text className="text-sm text-muted">
-                {stats.occupied}/{stats.total}
-              </Text>
-            </View>
 
-            <View className="gap-2">
-              <View className="flex-row justify-between items-center">
-                <Text className="text-xs text-muted">{t.addressList.occupied}</Text>
-                <Text className="text-sm font-semibold text-occupied">{stats.occupied}</Text>
-              </View>
-              <ProgressBar progress={(stats.occupied / stats.total) * 100} color="bg-occupied" />
-            </View>
-
-            {stats.wypowiedzenie > 0 && (
               <View className="gap-2">
                 <View className="flex-row justify-between items-center">
-                  <Text className="text-xs text-muted">{t.roomDetails.eviction}</Text>
-                  <Text className="text-sm font-semibold text-warning">{stats.wypowiedzenie}</Text>
+                  <Text className="text-xs text-muted">{t.addressList.occupied}</Text>
+                  <Text className="text-sm font-semibold text-occupied">{stats.occupied}</Text>
                 </View>
-                <ProgressBar progress={(stats.wypowiedzenie / stats.total) * 100} color="bg-warning" />
+                <ProgressBar progress={(stats.occupied / stats.total) * 100} color="bg-occupied" />
               </View>
-            )}
 
-
-          </View>
-        </Card>
-      </Pressable>
+              {stats.wypowiedzenie > 0 && (
+                <View className="gap-2">
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-xs text-muted">{t.roomDetails.eviction}</Text>
+                    <Text className="text-sm font-semibold text-warning">{stats.wypowiedzenie}</Text>
+                  </View>
+                  <ProgressBar progress={(stats.wypowiedzenie / stats.total) * 100} color="bg-warning" />
+                </View>
+              )}
+            </View>
+          </Card>
+        </Pressable>
+      </View>
     );
   };
 
@@ -157,46 +239,31 @@ export default function AddressDetailsScreen() {
   );
 
   return (
-    <ScreenContainer className="p-4">
+    <ScreenContainer>
       {/* Header */}
-      <View className="flex-row items-center gap-3 mb-6">
-        <Pressable
-          onPress={() => router.back()}
-          className="bg-surfaceVariant rounded-full p-2"
-        >
+      <View className="flex-row items-center gap-2 mb-4">
+        <Pressable onPress={() => router.back()} className="p-2">
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </Pressable>
         <Text className="text-2xl font-bold text-foreground flex-1">{address.name}</Text>
       </View>
 
-      {/* Tab Bar */}
-      <View className="flex-row gap-2 mb-6">
+      {/* Tabs */}
+      <View className="flex-row gap-2 mb-4">
         <Pressable
           onPress={() => setActiveTab('residents')}
-          className={`flex-1 py-3 px-4 rounded-full ${
-            activeTab === 'residents' ? 'bg-primary' : 'bg-surfaceVariant'
-          }`}
+          className={`flex-1 py-3 px-4 rounded-full ${activeTab === 'residents' ? 'bg-primary' : 'bg-surface'}`}
         >
-          <Text
-            className={`text-center font-semibold ${
-              activeTab === 'residents' ? 'text-foreground' : 'text-muted'
-            }`}
-          >
-            {t.addressDetails.residents}
+          <Text className={`text-center font-semibold ${activeTab === 'residents' ? 'text-background' : 'text-foreground'}`}>
+            Mieszkańcy
           </Text>
         </Pressable>
         <Pressable
           onPress={() => setActiveTab('rooms')}
-          className={`flex-1 py-3 px-4 rounded-full ${
-            activeTab === 'rooms' ? 'bg-primary' : 'bg-surfaceVariant'
-          }`}
+          className={`flex-1 py-3 px-4 rounded-full ${activeTab === 'rooms' ? 'bg-primary' : 'bg-surface'}`}
         >
-          <Text
-            className={`text-center font-semibold ${
-              activeTab === 'rooms' ? 'text-foreground' : 'text-muted'
-            }`}
-          >
-            {t.addressDetails.rooms}
+          <Text className={`text-center font-semibold ${activeTab === 'rooms' ? 'text-background' : 'text-foreground'}`}>
+            Pokoje
           </Text>
         </Pressable>
       </View>
@@ -222,7 +289,7 @@ export default function AddressDetailsScreen() {
           <View>
             {address.rooms.length === 0 ? (
               <View className="items-center justify-center py-8">
-                <Text className="text-muted">{t.messages.emptyRoom}</Text>
+                <Text className="text-muted">{t.messages.emptyAddress}</Text>
               </View>
             ) : (
               <FlatList
@@ -235,6 +302,119 @@ export default function AddressDetailsScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* FAB Button */}
+      <Pressable
+        onPress={() => router.push({
+          pathname: '/add-tenant',
+          params: { projectId, addressId },
+        })}
+        className="absolute bottom-20 right-4 w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg"
+        style={({ pressed }) => ({
+          opacity: pressed ? 0.8 : 1,
+        })}
+      >
+        <MaterialIcons name="add" size={28} color={colors.background} />
+      </Pressable>
+
+      {/* Tenant Menu Modal */}
+      <Modal
+        visible={tenantMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTenantMenuVisible(false)}
+      >
+        <Pressable
+          onPress={() => setTenantMenuVisible(false)}
+          className="flex-1 bg-black/50 items-center justify-center"
+        >
+          <Card className="w-48 p-2 gap-1">
+            <Pressable
+              onPress={() => {
+                if (selectedTenant) {
+                  router.push({
+                    pathname: '/add-tenant',
+                    params: { projectId, addressId, tenantId: selectedTenant.id },
+                  });
+                }
+                setTenantMenuVisible(false);
+              }}
+              className="p-3 flex-row items-center gap-2"
+            >
+              <MaterialIcons name="edit" size={20} color={colors.foreground} />
+              <Text className="text-foreground">{t.common.edit}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                if (selectedTenant) {
+                  router.push({
+                    pathname: '/room-details',
+                    params: { projectId, addressId, roomId: selectedTenant.spaceId, action: 'evict' },
+                  });
+                }
+                setTenantMenuVisible(false);
+              }}
+              className="p-3 flex-row items-center gap-2"
+            >
+              <MaterialIcons name="logout" size={20} color={colors.error} />
+              <Text className="text-error">{t.common.evict}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                if (selectedTenant) {
+                  handleDeleteTenant(selectedTenant);
+                }
+              }}
+              className="p-3 flex-row items-center gap-2"
+            >
+              <MaterialIcons name="delete" size={20} color={colors.error} />
+              <Text className="text-error">{t.common.delete}</Text>
+            </Pressable>
+          </Card>
+        </Pressable>
+      </Modal>
+
+      {/* Room Menu Modal */}
+      <Modal
+        visible={roomMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRoomMenuVisible(false)}
+      >
+        <Pressable
+          onPress={() => setRoomMenuVisible(false)}
+          className="flex-1 bg-black/50 items-center justify-center"
+        >
+          <Card className="w-48 p-2 gap-1">
+            <Pressable
+              onPress={() => {
+                if (selectedRoom) {
+                  router.push({
+                    pathname: '/add-address',
+                    params: { projectId, addressId, roomId: selectedRoom.id },
+                  });
+                }
+                setRoomMenuVisible(false);
+              }}
+              className="p-3 flex-row items-center gap-2"
+            >
+              <MaterialIcons name="edit" size={20} color={colors.foreground} />
+              <Text className="text-foreground">{t.common.edit}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                if (selectedRoom) {
+                  handleDeleteRoom(selectedRoom);
+                }
+              }}
+              className="p-3 flex-row items-center gap-2"
+            >
+              <MaterialIcons name="delete" size={20} color={colors.error} />
+              <Text className="text-error">{t.common.delete}</Text>
+            </Pressable>
+          </Card>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }

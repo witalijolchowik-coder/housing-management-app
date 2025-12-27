@@ -46,7 +46,7 @@ export interface Space {
   roomId: string;
   number: number;
   status: SpaceStatus;
-  tenant?: Tenant;
+  tenant?: Tenant | null;
   wypowiedzenie?: Wypowiedzenie;
   amenities?: {
     shower: boolean;

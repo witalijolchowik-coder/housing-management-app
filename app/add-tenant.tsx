@@ -1,19 +1,20 @@
-import { ScrollView, Text, View, Pressable, TextInput } from 'react-native';
+import { ScrollView, Text, View, Pressable, TextInput, Alert } from 'react-native';
 import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
-import { Chip } from '@/components/ui/chip';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Gender } from '@/types';
+import { Gender, Tenant } from '@/types';
 import { MaterialIcons } from '@expo/vector-icons';
+import { loadData, saveData } from '@/lib/store';
 
 export default function AddTenantScreen() {
   const t = useTranslations();
   const colors = useColors();
   const router = useRouter();
-  const { projectId, addressId, roomId } = useLocalSearchParams();
+  const { projectId, addressId } = useLocalSearchParams();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -32,31 +33,61 @@ export default function AddTenantScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!firstName || !lastName || !checkInDate || !monthlyPrice) {
-      alert(t.messages.savingError);
+    if (!firstName.trim() || !lastName.trim() || !checkInDate || !monthlyPrice.trim()) {
+      Alert.alert('Błąd', 'Proszę wypełnić wszystkie wymagane pola');
       return;
     }
 
     try {
-      // TODO: Implement tenant check-in logic with actual room/space selection
-      console.log('Check-in tenant:', {
-        firstName,
-        lastName,
+      const projects = await loadData();
+      const project = projects.find((p) => p.id === projectId);
+      
+      if (!project) {
+        Alert.alert('Błąd', 'Projekt nie znaleziony');
+        return;
+      }
+
+      const address = project.addresses.find((a) => a.id === addressId);
+      if (!address) {
+        Alert.alert('Błąd', 'Adres nie znaleziony');
+        return;
+      }
+
+      // Create new tenant
+      const newTenant: Tenant = {
+        id: generateUUID(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         gender,
-        birthYear,
+        birthYear: birthYear.trim() ? parseInt(birthYear.trim()) : new Date().getFullYear() - 30,
         checkInDate,
-        workStartDate,
-        monthlyPrice,
-      });
-      alert(t.messages.saveSuccess);
+        workStartDate: workStartDate || undefined,
+        monthlyPrice: parseFloat(monthlyPrice) || 0,
+      };
+
+      // Add tenant to first available space in address
+      let assigned = false;
+      for (const room of address.rooms) {
+        for (const space of room.spaces) {
+          if (!space.tenant) {
+            space.tenant = newTenant;
+            assigned = true;
+            break;
+          }
+        }
+        if (assigned) break;
+      }
+
+      await saveData(projects);
+      Alert.alert('Sukces', assigned ? 'Mieszkaniec dodany i przydzielony do pokoju' : 'Mieszkaniec dodany (brak wolnych miejsc)');
       router.back();
     } catch (error) {
-      console.error('Error checking in tenant:', error);
-      alert(t.messages.savingError);
+      console.error('Error adding tenant:', error);
+      Alert.alert('Błąd', 'Nie udało się dodać mieszkańca');
     }
   };
 
-  const FormField = ({ label, value, onChangeText, placeholder, multiline = false }: any) => (
+  const FormField = ({ label, value, onChangeText, placeholder, multiline = false, keyboardType = 'default' }: any) => (
     <View className="gap-2 mb-4">
       <Text className="text-sm font-semibold text-foreground">{label}</Text>
       <TextInput
@@ -65,6 +96,7 @@ export default function AddTenantScreen() {
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
         multiline={multiline}
+        keyboardType={keyboardType}
         className="bg-surfaceVariant rounded-lg px-4 py-3 text-foreground"
       />
     </View>
@@ -81,74 +113,84 @@ export default function AddTenantScreen() {
           >
             <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
           </Pressable>
-          <Text className="text-2xl font-bold text-foreground flex-1">{t.forms.addTenant}</Text>
+          <Text className="text-2xl font-bold text-foreground flex-1">Dodaj mieszkańca</Text>
         </View>
 
         {/* Form */}
         <Card className="p-6 gap-4">
           {/* Name Fields */}
           <FormField
-            label={t.resident.firstName}
+            label="Imię"
             value={firstName}
             onChangeText={setFirstName}
-            placeholder={t.resident.firstName}
+            placeholder="Jan"
           />
           <FormField
-            label={t.resident.lastName}
+            label="Nazwisko"
             value={lastName}
             onChangeText={setLastName}
-            placeholder={t.resident.lastName}
+            placeholder="Kowalski"
           />
 
-          {/* Gender Selection */}
+          {/* Gender Selection - Only Male/Female */}
           <View className="gap-2 mb-4">
-            <Text className="text-sm font-semibold text-foreground">{t.resident.gender}</Text>
+            <Text className="text-sm font-semibold text-foreground">Płeć</Text>
             <View className="flex-row gap-2">
-              <Chip
-                label="♂"
-                selected={gender === 'male'}
+              <Pressable
                 onPress={() => setGender('male')}
-              />
-              <Chip
-                label="♀"
-                selected={gender === 'female'}
+                className={`flex-1 rounded-lg py-3 items-center ${
+                  gender === 'male' ? 'bg-primary' : 'bg-surface border border-border'
+                }`}
+              >
+                <Text className={`font-semibold ${gender === 'male' ? 'text-background' : 'text-foreground'}`}>
+                  ♂ Mężczyzna
+                </Text>
+              </Pressable>
+              <Pressable
                 onPress={() => setGender('female')}
-              />
+                className={`flex-1 rounded-lg py-3 items-center ${
+                  gender === 'female' ? 'bg-primary' : 'bg-surface border border-border'
+                }`}
+              >
+                <Text className={`font-semibold ${gender === 'female' ? 'text-background' : 'text-foreground'}`}>
+                  ♀ Kobieta
+                </Text>
+              </Pressable>
             </View>
           </View>
 
           {/* Birth Year */}
           <FormField
-            label={t.resident.birthYear}
+            label="Rok urodzenia (opcjonalnie)"
             value={birthYear}
             onChangeText={setBirthYear}
             placeholder="1990"
+            keyboardType="number-pad"
           />
 
-          {/* Check-in Date */}
-          <View className="gap-2 mb-4">
-            <Text className="text-sm font-semibold text-foreground">{t.resident.checkInDate}</Text>
-            <Pressable className="bg-surfaceVariant rounded-lg px-4 py-3 flex-row items-center justify-between">
-              <Text className="text-foreground">{checkInDate || t.common.loading}</Text>
-              <MaterialIcons name="calendar-month" size={20} color={colors.primary} />
-            </Pressable>
-          </View>
+          {/* Check-in Date - Required */}
+          <DatePicker
+            value={checkInDate}
+            onChange={setCheckInDate}
+            label="Data zamelowania *"
+            placeholder="Wybierz datę"
+          />
 
-          {/* Work Start Date (Optional) */}
-          <View className="gap-2 mb-4">
-            <Text className="text-sm font-semibold text-foreground">{t.resident.workStartDate}</Text>
-            <Pressable className="bg-surfaceVariant rounded-lg px-4 py-3 flex-row items-center justify-between">
-              <Text className="text-muted">{workStartDate || t.common.loading}</Text>
-              <MaterialIcons name="calendar-month" size={20} color={colors.primary} />
-            </Pressable>
-          </View>
+          {/* Work Start Date - Optional */}
+          <DatePicker
+            value={workStartDate}
+            onChange={setWorkStartDate}
+            label="Data rozpoczęcia pracy (opcjonalnie)"
+            placeholder="Wybierz datę"
+          />
 
           {/* Monthly Price */}
           <FormField
-            label={t.resident.monthlyPrice}
+            label="Cena miesięczna (zł) *"
             value={monthlyPrice}
             onChangeText={setMonthlyPrice}
             placeholder="500"
+            keyboardType="decimal-pad"
           />
 
           {/* Submit Button */}
@@ -159,7 +201,7 @@ export default function AddTenantScreen() {
             })}
             className="bg-primary rounded-lg px-6 py-4 items-center mt-4"
           >
-            <Text className="text-foreground font-semibold text-base">{t.common.save}</Text>
+            <Text className="text-background font-semibold text-base">Dodaj mieszkańca</Text>
           </Pressable>
         </Card>
       </ScrollView>

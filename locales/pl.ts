@@ -17,6 +17,7 @@ export const pl = {
     success: 'Sukces',
     warning: 'Ostrzeżenie',
     noData: 'Brak danych',
+    evict: 'Wyselić',
   },
 
   // Navigation

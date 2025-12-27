@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, FlatList, Pressable } from 'react-native';
+import { ScrollView, Text, View, FlatList, Pressable, Modal } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
@@ -7,10 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Room, Space } from '@/types';
-import { loadData, getDaysRemaining, isOverdue } from '@/lib/store';
+import { Address, Room, Space } from '@/types';
+import { loadData, getDaysRemaining, saveData } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
-import { FAB } from '@/components/ui/fab';
 
 export default function RoomDetailsScreen() {
   const t = useTranslations();
@@ -18,7 +17,10 @@ export default function RoomDetailsScreen() {
   const router = useRouter();
   const { projectId, addressId, roomId } = useLocalSearchParams();
   const [room, setRoom] = useState<Room | null>(null);
+  const [address, setAddress] = useState<Address | null>(null);
   const [loading, setLoading] = useState(true);
+  const [spaceMenuVisible, setSpaceMenuVisible] = useState(false);
+  const [selectedSpace, setSelectedSpace] = useState<Space | undefined>(undefined);
 
   useEffect(() => {
     loadRoom();
@@ -26,15 +28,15 @@ export default function RoomDetailsScreen() {
 
   const loadRoom = async () => {
     try {
-      setLoading(true);
       const projects = await loadData();
       const project = projects.find((p) => p.id === projectId);
       if (project) {
-        const address = project.addresses.find((a) => a.id === addressId);
-        if (address) {
-          const foundRoom = address.rooms.find((r) => r.id === roomId);
-          if (foundRoom) {
-            setRoom(foundRoom);
+        const addr = project.addresses.find((a) => a.id === addressId);
+        if (addr) {
+          setAddress(addr);
+          const r = addr.rooms.find((rm) => rm.id === roomId);
+          if (r) {
+            setRoom(r);
           }
         }
       }
@@ -45,12 +47,10 @@ export default function RoomDetailsScreen() {
     }
   };
 
-  if (loading || !room) {
+  if (loading || !room || !address) {
     return (
-      <ScreenContainer className="p-4">
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-muted">{t.common.loading}</Text>
-        </View>
+      <ScreenContainer>
+        <Text className="text-muted">{t.common.loading}</Text>
       </ScreenContainer>
     );
   }
@@ -61,105 +61,186 @@ export default function RoomDetailsScreen() {
     couple: `♡ ${t.roomDetails.couple}`,
   };
 
-  const getSpaceStatusColor = (space: Space) => {
-    switch (space.status) {
-      case 'vacant':
-        return colors.success;
-      case 'occupied':
-        return colors.occupied;
-      case 'wypowiedzenie':
-        return colors.warning;
-      default:
-        return colors.muted;
+  const getSpaceStatus = (space: Space): { label: string; color: string; icon: string } => {
+    if (space.wypowiedzenie) {
+      const daysRemaining = getDaysRemaining(space.wypowiedzenie.endDate);
+      if (space.tenant) {
+        return {
+          label: `Zajęte (${daysRemaining} dni)`,
+          color: 'bg-warning',
+          icon: 'warning',
+        };
+      } else {
+        return {
+          label: `Wypowiedzenie (${daysRemaining} dni)`,
+          color: 'bg-warning',
+          icon: 'schedule',
+        };
+      }
+    } else if (space.tenant) {
+      return {
+        label: 'Zajęte',
+        color: 'bg-success',
+        icon: 'check-circle',
+      };
+    } else {
+      return {
+        label: 'Wolne',
+        color: 'bg-muted',
+        icon: 'circle-outline',
+      };
+    }
+  };
+
+  const handleDeleteSpace = async (space: Space) => {
+    try {
+      if (space.tenant) {
+        alert('Nie możesz usunąć zajęte miejsce');
+        return;
+      }
+      const projects = await loadData();
+      const project = projects.find((p) => p.id === projectId);
+      if (project) {
+        const addr = project.addresses.find((a) => a.id === addressId);
+        if (addr) {
+          const r = addr.rooms.find((rm) => rm.id === roomId);
+          if (r) {
+            r.spaces = r.spaces.filter((s) => s.id !== space.id);
+            await saveData(projects);
+            await loadRoom();
+            setSpaceMenuVisible(false);
+            setSelectedSpace(undefined);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting space:', error);
+    }
+  }
+
+  const handleToggleWypowiedzenie = async (space: Space, putOn: boolean) => {
+    try {
+      const projects = await loadData();
+      const project = projects.find((p) => p.id === projectId);
+      if (project) {
+        const addr = project.addresses.find((a) => a.id === addressId);
+        if (addr) {
+          const r = addr.rooms.find((rm) => rm.id === roomId);
+          if (r) {
+            const s = r.spaces.find((sp) => sp.id === space.id);
+            if (s) {
+              if (putOn) {
+                const wypowiedzenieDays = 14;
+                const startDate = new Date();
+                const endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + wypowiedzenieDays);
+                s.wypowiedzenie = {
+                  startDate: startDate.toISOString().split('T')[0],
+                  endDate: endDate.toISOString().split('T')[0],
+                  paidUntil: endDate.toISOString().split('T')[0],
+                  groupedWithAddress: false,
+                };
+              } else {
+                s.wypowiedzenie = undefined;
+              }
+              await saveData(projects);
+              await loadRoom();
+              setSpaceMenuVisible(false);
+              setSelectedSpace(undefined);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling wypowiedzenie:', error);
     }
   };
 
   const renderSpaceCard = ({ item }: { item: Space }) => {
-    const getSpaceContent = () => {
-      if (item.status === 'vacant') {
-        return {
-          title: t.roomDetails.vacant,
-          subtitle: '',
-          badge: 'success',
-        };
-      }
-
-      if (item.status === 'occupied' && item.tenant) {
-        return {
-          title: `${item.tenant.firstName} ${item.tenant.lastName}`,
-          subtitle: item.tenant.checkInDate,
-          badge: 'info',
-        };
-      }
-
-      if (item.status === 'wypowiedzenie' && item.wypowiedzenie) {
-        const daysLeft = getDaysRemaining(item.wypowiedzenie.endDate);
-        return {
-          title: item.tenant
-            ? `${item.tenant.firstName} ${item.tenant.lastName}`
-            : t.roomDetails.vacant,
-          subtitle: `${t.checkout.daysRemaining}: ${daysLeft}`,
-          badge: 'warning',
-          progress: true,
-          progressValue: Math.max(0, (daysLeft / 14) * 100),
-        };
-      }
-
-      return {
-        title: t.common.loading,
-        subtitle: '',
-        badge: 'default',
-      };
-    };
-
-    const content = getSpaceContent();
+    const status = getSpaceStatus(item);
+    const daysRemaining = item.wypowiedzenie ? getDaysRemaining(item.wypowiedzenie.endDate) : 0;
 
     return (
-      <Card className="p-4 mb-3">
-        <View className="gap-3">
-          <View className="flex-row justify-between items-start">
-            <View className="flex-1">
-              <Text className="text-base font-semibold text-foreground">{content.title}</Text>
-              {content.subtitle && (
-                <Text className="text-sm text-muted mt-1">{content.subtitle}</Text>
-              )}
+      <View>
+        <Card className="p-4 mb-3">
+          <View className="gap-3">
+            <View className="flex-row justify-between items-start">
+              <View className="flex-1">
+                <Text className="text-lg font-bold text-foreground">
+                  Miejsce {item.number}
+                </Text>
+                <Badge
+                  variant={status.color === 'bg-success' ? 'success' : status.color === 'bg-warning' ? 'warning' : 'default'}
+                  size="sm"
+                  label={status.label}
+                  className="mt-2"
+                />
+              </View>
+              <Pressable
+                onPress={() => {
+                  setSelectedSpace(item);
+                  setSpaceMenuVisible(true);
+                }}
+                className="p-2"
+              >
+                <MaterialIcons name="more-vert" size={20} color={colors.foreground} />
+              </Pressable>
             </View>
-            <Badge variant={content.badge as any} size="sm" label={`${t.roomDetails.title} ${item.number}`} />
+
+            {item.tenant ? (
+              <View className="gap-2 pt-2 border-t border-border">
+                <Text className="text-sm font-semibold text-foreground">
+                  {item.tenant.firstName} {item.tenant.lastName}
+                </Text>
+                <Text className="text-xs text-muted">
+                  Zarezerwowane: {item.tenant.checkInDate}
+                </Text>
+                <Text className="text-sm font-semibold text-foreground">
+                  {item.tenant.monthlyPrice} zł/miesiąc
+                </Text>
+              </View>
+            ) : (
+              <View className="gap-2 pt-2 border-t border-border">
+                <Text className="text-sm text-muted">Brak rezerwacji</Text>
+              </View>
+            )}
+
+            {item.wypowiedzenie && (
+              <View className="gap-2 pt-2 border-t border-border">
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-xs text-muted">Wypowiedzenie:</Text>
+                  <Text className="text-sm font-semibold text-warning">{daysRemaining} dni</Text>
+                </View>
+                <ProgressBar
+                  progress={Math.max(0, (daysRemaining / 14) * 100)}
+                  color="bg-warning"
+                />
+              </View>
+            )}
           </View>
-
-          {content.progress && (
-            <ProgressBar progress={content.progressValue || 0} color="bg-warning" />
-          )}
-
-
-        </View>
-      </Card>
+        </Card>
+      </View>
     );
   };
 
   return (
-    <ScreenContainer className="p-4">
+    <ScreenContainer>
       {/* Header */}
-      <View className="flex-row items-center gap-3 mb-6">
-        <Pressable
-          onPress={() => router.back()}
-          className="bg-surfaceVariant rounded-full p-2"
-        >
+      <View className="flex-row items-center gap-2 mb-4">
+        <Pressable onPress={() => router.back()} className="p-2">
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </Pressable>
         <View className="flex-1">
-          <Text className="text-2xl font-bold text-foreground">
-            {t.roomDetails.title} {room.name}
-          </Text>
-          <Text className="text-sm text-muted mt-1">{roomTypeLabel[room.type]}</Text>
+          <Text className="text-2xl font-bold text-foreground">{t.roomDetails.title} {room.name}</Text>
+          <Text className="text-sm text-muted">{roomTypeLabel[room.type]}</Text>
         </View>
       </View>
 
-      {/* Spaces List */}
-      <ScrollView contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
+      {/* Content */}
+      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         {room.spaces.length === 0 ? (
           <View className="items-center justify-center py-8">
-            <Text className="text-muted">{t.messages.emptyRoom}</Text>
+            <Text className="text-muted">{t.messages.emptyAddress}</Text>
           </View>
         ) : (
           <FlatList
@@ -171,8 +252,91 @@ export default function RoomDetailsScreen() {
         )}
       </ScrollView>
 
-      {/* FAB */}
-      <FAB icon="add" onPress={() => router.push('/add-tenant')} />
+      {/* FAB Button - Add Tenant to Room */}
+      <Pressable
+        onPress={() => {
+          router.push({
+            pathname: '/select-tenant',
+            params: { projectId, addressId, roomId },
+          });
+        }}
+        className="absolute bottom-20 right-4 w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg"
+        style={({ pressed }) => ({
+          opacity: pressed ? 0.8 : 1,
+        })}
+      >
+        <MaterialIcons name="add" size={28} color={colors.background} />
+      </Pressable>
+
+      {/* Space Menu Modal */}
+      <Modal
+        visible={spaceMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSpaceMenuVisible(false)}
+      >
+        <Pressable
+          onPress={() => setSpaceMenuVisible(false)}
+          className="flex-1 bg-black/50 items-center justify-center"
+        >
+          <Card className="w-56 p-2 gap-1">
+            {selectedSpace && (
+              <>
+                <Pressable
+                  onPress={() => {
+                    // TODO: Edit space
+                    setSpaceMenuVisible(false);
+                  }}
+                  className="p-3 flex-row items-center gap-2"
+                >
+                  <MaterialIcons name="edit" size={20} color={colors.foreground} />
+                  <Text className="text-foreground">{t.common.edit}</Text>
+                </Pressable>
+
+                {!selectedSpace.tenant && (
+                  <Pressable
+                    onPress={() => {
+                      if (selectedSpace) {
+                        handleDeleteSpace(selectedSpace);
+                      }
+                    }}
+                    className="p-3 flex-row items-center gap-2"
+                  >
+                    <MaterialIcons name="delete" size={20} color={colors.error} />
+                    <Text className="text-error">{t.common.delete}</Text>
+                  </Pressable>
+                )}
+
+                {selectedSpace.wypowiedzenie ? (
+                  <Pressable
+                    onPress={() => {
+                      if (selectedSpace) {
+                        handleToggleWypowiedzenie(selectedSpace, false);
+                      }
+                    }}
+                    className="p-3 flex-row items-center gap-2"
+                  >
+                    <MaterialIcons name="cancel" size={20} color={colors.warning} />
+                    <Text className="text-warning">Anuluj wypowiedzenie</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      if (selectedSpace) {
+                        handleToggleWypowiedzenie(selectedSpace, true);
+                      }
+                    }}
+                    className="p-3 flex-row items-center gap-2"
+                  >
+                    <MaterialIcons name="schedule" size={20} color={colors.warning} />
+                    <Text className="text-warning">Postaw na wypowiedzenie</Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+          </Card>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
