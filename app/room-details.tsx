@@ -10,6 +10,7 @@ import { useColors } from '@/hooks/use-colors';
 import { Address, Room, Space } from '@/types';
 import { loadData, getDaysRemaining, saveData } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
+import { ScrollView, Text, View, TouchableOpacity, Modal, Pressable, Alert } from 'react-native';
 
 export default function RoomDetailsScreen() {
   const t = useTranslations();
