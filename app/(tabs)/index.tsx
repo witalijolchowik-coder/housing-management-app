@@ -61,7 +61,6 @@ export default function DashboardScreen() {
     let totalOccupied = 0;
     let totalVacant = 0;
     let totalWypowiedzenie = 0;
-    let totalCost = 0;
 
     for (const project of projects) {
       const stats = calculateProjectStats(project);
@@ -69,18 +68,13 @@ export default function DashboardScreen() {
       totalOccupied += stats.occupied;
       totalVacant += stats.vacant;
       totalWypowiedzenie += stats.wypowiedzenie;
-      
-      // Calculate total cost
-      for (const address of project.addresses) {
-        totalCost += address.totalCost || 0;
-      }
     }
 
     const occupancyPercent = totalSpaces > 0 
       ? Math.round(((totalOccupied + totalWypowiedzenie) / totalSpaces) * 100)
       : 0;
 
-    return { totalSpaces, totalOccupied, totalVacant, totalWypowiedzenie, occupancyPercent, totalCost };
+    return { totalSpaces, totalOccupied, totalVacant, totalWypowiedzenie, occupancyPercent };
   };
 
   const handleProjectPress = (projectId: string) => {
@@ -206,89 +200,66 @@ export default function DashboardScreen() {
         </Pressable>
       </View>
 
-      {/* Dashboard Statistics */}
+      {/* Dashboard Statistics - Compact Grid */}
       {!loading && projects.length > 0 && (
-        <View className="gap-3 mb-6">
-          {/* Occupancy - Large card */}
-          <Pressable>
-            <Card className="p-6 bg-primary items-center">
-              <Text className="text-white text-sm font-medium">Obłożenie</Text>
-              <Text className="text-white text-5xl font-bold mt-2">{overallStats.occupancyPercent}%</Text>
-              <Text className="text-white/80 text-sm mt-2">Cel: 100%</Text>
-            </Card>
-          </Pressable>
+        <View className="mb-4">
+          {/* 2x3 Grid Layout */}
+          <View className="flex-row gap-2 mb-2">
+            {/* Occupancy */}
+            <Pressable className="flex-1">
+              <Card className="p-3 bg-primary items-center">
+                <Text className="text-white text-xs font-medium">Obłożenie</Text>
+                <Text className="text-white text-3xl font-bold mt-1">{overallStats.occupancyPercent}%</Text>
+              </Card>
+            </Pressable>
 
-          {/* Stats Grid */}
-          <View className="gap-3">
             {/* Total Spaces */}
-            <Pressable>
-              <Card className="p-4 flex-row justify-between items-center">
-                <View>
-                  <Text className="text-sm text-muted">Razem miejsc</Text>
-                  <Text className="text-2xl font-bold text-foreground mt-1">{overallStats.totalSpaces}</Text>
-                </View>
-                <MaterialIcons name="apartment" size={32} color={colors.primary} />
+            <Pressable className="flex-1">
+              <Card className="p-3 items-center">
+                <MaterialIcons name="apartment" size={24} color={colors.primary} />
+                <Text className="text-xs text-muted mt-1">Razem</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.totalSpaces}</Text>
               </Card>
             </Pressable>
 
-            {/* Occupied Spaces */}
-            <Pressable>
-              <Card className="p-4 flex-row justify-between items-center">
-                <View>
-                  <Text className="text-sm text-muted">Zajęte miejsca</Text>
-                  <Text className="text-2xl font-bold text-foreground mt-1">{overallStats.totalOccupied}</Text>
-                </View>
-                <MaterialIcons name="person" size={32} color={colors.success} />
+            {/* Occupied */}
+            <Pressable className="flex-1">
+              <Card className="p-3 items-center">
+                <MaterialIcons name="person" size={24} color={colors.success} />
+                <Text className="text-xs text-muted mt-1">Zajęte</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.totalOccupied}</Text>
               </Card>
             </Pressable>
+          </View>
 
-            {/* Vacant Spaces */}
-            <Pressable>
-              <Card className="p-4 flex-row justify-between items-center">
-                <View>
-                  <Text className="text-sm text-muted">Wolne miejsca</Text>
-                  <Text className="text-2xl font-bold text-foreground mt-1">{overallStats.totalVacant}</Text>
-                </View>
-                <MaterialIcons name="event-available" size={32} color={colors.warning} />
+          <View className="flex-row gap-2">
+            {/* Vacant */}
+            <Pressable className="flex-1">
+              <Card className="p-3 items-center">
+                <MaterialIcons name="event-available" size={24} color={colors.warning} />
+                <Text className="text-xs text-muted mt-1">Wolne</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.totalVacant}</Text>
               </Card>
             </Pressable>
 
             {/* Wypowiedzenie */}
-            <Pressable>
-              <Card className="p-4 flex-row justify-between items-center">
-                <View>
-                  <Text className="text-sm text-muted">Na wypowiedzeniu</Text>
-                  <Text className="text-2xl font-bold text-foreground mt-1">{overallStats.totalWypowiedzenie}</Text>
-                </View>
-                <MaterialIcons name="warning" size={32} color={colors.warning} />
+            <Pressable className="flex-1">
+              <Card className="p-3 items-center">
+                <MaterialIcons name="warning" size={24} color={colors.warning} />
+                <Text className="text-xs text-muted mt-1">Wyp.</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.totalWypowiedzenie}</Text>
               </Card>
             </Pressable>
 
             {/* Conflicts */}
-            <Pressable>
-              <Card className="p-4 flex-row justify-between items-center">
-                <View>
-                  <Text className="text-sm text-muted">Konflikty</Text>
-                  <Text className="text-2xl font-bold text-foreground mt-1">{conflicts.length}</Text>
-                </View>
-                <MaterialIcons name="error" size={32} color={colors.error} />
+            <Pressable className="flex-1">
+              <Card className="p-3 items-center">
+                <MaterialIcons name="error" size={24} color={colors.error} />
+                <Text className="text-xs text-muted mt-1">Konflikty</Text>
+                <Text className="text-xl font-bold text-foreground">{conflicts.length}</Text>
               </Card>
             </Pressable>
-
-            {/* Total Cost */}
-            <Card className="p-4 flex-row justify-between items-center">
-              <View>
-                <Text className="text-sm text-muted">Całkowity koszt</Text>
-                <Text className="text-2xl font-bold text-foreground mt-1">
-                  {overallStats.totalCost.toLocaleString('pl-PL')} PLN
-                </Text>
-              </View>
-              <MaterialIcons name="attach-money" size={32} color={colors.primary} />
-            </Card>
           </View>
-
-          {/* Divider */}
-          <View className="h-px bg-border my-2" />
         </View>
       )}
 

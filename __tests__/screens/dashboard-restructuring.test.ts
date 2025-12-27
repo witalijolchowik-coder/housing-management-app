@@ -180,27 +180,19 @@ describe('Dashboard Statistics Restructuring', () => {
     it('should display all required dashboard cards', () => {
       const dashboardCards = [
         { id: 'occupancy', label: 'Obłożenie', value: '50%' },
-        { id: 'totalSpaces', label: 'Razem miejsc', value: '8' },
-        { id: 'occupied', label: 'Zajęte miejsca', value: '3' },
-        { id: 'vacant', label: 'Wolne miejsca', value: '3' },
-        { id: 'wypowiedzenie', label: 'Na wypowiedzeniu', value: '1' },
-        { id: 'conflicts', label: 'Konflikty', value: '0' },
-        { id: 'totalCost', label: 'Całkowity koszt', value: '4500 PLN' }
+        { id: 'totalSpaces', label: 'Razem', value: '8' },
+        { id: 'occupied', label: 'Zajęte', value: '3' },
+        { id: 'vacant', label: 'Wolne', value: '3' },
+        { id: 'wypowiedzenie', label: 'Wyp.', value: '1' },
+        { id: 'conflicts', label: 'Konflikty', value: '0' }
       ];
 
-      expect(dashboardCards).toHaveLength(7);
+      expect(dashboardCards).toHaveLength(6);
       expect(dashboardCards.map(c => c.id)).toContain('occupancy');
       expect(dashboardCards.map(c => c.id)).toContain('conflicts');
-      expect(dashboardCards.map(c => c.id)).toContain('totalCost');
+      expect(dashboardCards.map(c => c.id)).not.toContain('totalCost');
     });
 
-    it('should format currency values correctly', () => {
-      const totalCost = 4500;
-      const formatted = totalCost.toLocaleString('pl-PL') + ' PLN';
-      
-      expect(formatted).toContain('PLN');
-      expect(formatted).toContain('4500');
-    });
   });
 
   describe('Statistics Hierarchy', () => {
