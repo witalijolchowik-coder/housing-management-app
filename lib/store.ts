@@ -86,6 +86,22 @@ export const getConflicts = (project: Project): Conflict[] => {
   const conflicts: Conflict[] = [];
   
   for (const address of project.addresses) {
+    // Check unassigned tenants
+    for (const tenant of address.unassignedTenants) {
+      conflicts.push({
+        id: generateId(),
+        type: 'no_room',
+        projectId: project.id,
+        projectName: project.name,
+        addressId: address.id,
+        addressName: address.name,
+        tenantId: tenant.id,
+        firstName: tenant.firstName,
+        lastName: tenant.lastName,
+        message: `Określ pokój dla ${tenant.firstName} ${tenant.lastName}`,
+      });
+    }
+
     for (const room of address.rooms) {
       for (const space of room.spaces) {
         // Type 1: Tenant without room
@@ -697,6 +713,7 @@ export const initializeDemoData = async (): Promise<void> => {
           pricePerSpace: 500,
           couplePrice: 800,
           photos: [],
+          unassignedTenants: [],
           rooms: [
             {
               id: generateId(),

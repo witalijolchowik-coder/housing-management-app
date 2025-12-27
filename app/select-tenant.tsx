@@ -37,49 +37,18 @@ export default function SelectTenantScreen() {
           setAddress(addr);
           
           // Organize tenants into sections
-          const withoutRoom: (Tenant & { currentRoom?: string })[] = [];
-          const withRoom: (Tenant & { currentRoom?: string })[] = [];
+          // Section 1: Unassigned tenants (from unassignedTenants array)
+          const withoutRoomList = addr.unassignedTenants.map((t) => ({ ...t }));
 
+          // Section 2: Already assigned tenants (from rooms)
+          const withRoomList: (Tenant & { currentRoom?: string })[] = [];
           for (const room of addr.rooms) {
             for (const space of room.spaces) {
               if (space.tenant) {
-                const tenantWithRoom = { ...space.tenant, currentRoom: room.name };
-                withRoom.push(tenantWithRoom);
+                withRoomList.push({ ...space.tenant, currentRoom: room.name });
               }
             }
           }
-
-          // Find tenants without rooms
-          const allTenantsInRooms = new Set(withRoom.map((t) => t.id));
-          for (const room of addr.rooms) {
-            for (const space of room.spaces) {
-              if (space.tenant && !allTenantsInRooms.has(space.tenant.id)) {
-                withoutRoom.push(space.tenant);
-              }
-            }
-          }
-
-          // Actually, we need to check all tenants in the address
-          // Let's rebuild this logic
-          const allTenants = new Map<string, Tenant>();
-          const tenantsWithRooms = new Map<string, string>(); // tenantId -> roomName
-
-          for (const room of addr.rooms) {
-            for (const space of room.spaces) {
-              if (space.tenant) {
-                allTenants.set(space.tenant.id, space.tenant);
-                tenantsWithRooms.set(space.tenant.id, room.name);
-              }
-            }
-          }
-
-          const withoutRoomList = Array.from(allTenants.values())
-            .filter((t) => !tenantsWithRooms.has(t.id))
-            .map((t) => ({ ...t }));
-
-          const withRoomList = Array.from(allTenants.values())
-            .filter((t) => tenantsWithRooms.has(t.id))
-            .map((t) => ({ ...t, currentRoom: tenantsWithRooms.get(t.id) }));
 
           setSections([
             {
@@ -117,7 +86,10 @@ export default function SelectTenantScreen() {
         if (addr) {
           const room = addr.rooms.find((r) => r.id === roomId);
           if (room) {
-            // First, remove tenant from any other space in this address
+            // Remove tenant from unassignedTenants if present
+            addr.unassignedTenants = addr.unassignedTenants.filter((t) => t.id !== tenant.id);
+
+            // Remove tenant from any other space in this address
             for (const r of addr.rooms) {
               for (const space of r.spaces) {
                 if (space.tenant?.id === tenant.id) {
@@ -126,7 +98,7 @@ export default function SelectTenantScreen() {
               }
             }
 
-            // Then, find the first available space in the target room and assign tenant
+            // Find the first available space in the target room and assign tenant
             const availableSpace = room.spaces.find((s) => !s.tenant);
             if (availableSpace) {
               availableSpace.tenant = tenant;

@@ -86,6 +86,7 @@ export default function AddAddressScreen() {
           ...r,
           addressId: '', // Placeholder, will be set properly
         })),
+        unassignedTenants: [],
         photos: [],
       };
 

@@ -243,3 +243,16 @@
 - [x] Fix tenant creation logic - add tenant without room assignment (status "Bez miejsca")
 - [x] Tenant appears in list immediately after creation
 - [ ] Test form on Android device
+
+
+### Tenant Settlement Workflow Implementation
+- [x] Add unassignedTenants array to Address type
+- [x] Update add-tenant.tsx to add tenant to unassignedTenants (not to rooms)
+- [x] Update address-details.tsx to display all tenants (unassigned + assigned)
+- [x] Show "Bez miejsca" status for unassigned tenants in red
+- [x] Update select-tenant.tsx to use unassignedTenants array
+- [x] Remove tenant from unassignedTenants when assigning to room
+- [x] Update handleDeleteTenant to remove from unassignedTenants
+- [x] Update getConflicts to detect unassigned tenants as conflicts
+- [x] Write comprehensive tests for settlement workflow (15 tests)
+- [x] All 106 tests passing

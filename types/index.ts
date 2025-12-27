@@ -91,6 +91,7 @@ export interface Address {
   couplePrice?: number; // Price for couple rooms
   photos: string[];
   rooms: Room[];
+  unassignedTenants: Tenant[]; // Tenants without assigned space (temporary, waiting for room assignment)
   status?: 'active' | 'wypowiedzenie'; // Address-level status
   addressWypowiedzienieStart?: string; // When address was put on wypowiedzenie
   operator?: OperatorType; // Operator: Rent Planet, E-Port, or Other

@@ -67,9 +67,10 @@ export default function AddTenantScreen() {
         monthlyPrice: parseFloat(monthlyPrice) || 0,
       };
 
-      // Tenant is added without space assignment (spaceId is undefined)
-      // It will appear in the tenant list with status "Bez miejsca"
+      // Add tenant to unassignedTenants array
+      // Tenant will appear in the tenant list with status "Bez miejsca"
       // User can later assign it to a space from the Pokoje tab
+      address.unassignedTenants.push(newTenant);
 
       await saveData(projects);
       Alert.alert('Sukces', `Mieszkaniec "${firstName} ${lastName}" dodany bez miejsca`);

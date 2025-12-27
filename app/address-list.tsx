@@ -120,6 +120,7 @@ export default function AddressListScreen() {
         await addAddress(projectId as string, {
           ...data,
           photos: [],
+          unassignedTenants: [],
         });
       }
       setEditingAddress(undefined);

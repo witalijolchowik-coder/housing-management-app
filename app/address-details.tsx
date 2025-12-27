@@ -72,10 +72,16 @@ export default function AddressDetailsScreen() {
       if (project) {
         const addr = project.addresses.find((a) => a.id === addressId);
         if (addr) {
-          for (const room of addr.rooms) {
-            const space = room.spaces.find((s) => s.id === tenant.spaceId);
-            if (space) {
-              space.tenant = null;
+          // Remove from unassignedTenants if present
+          addr.unassignedTenants = addr.unassignedTenants.filter((t) => t.id !== tenant.id);
+
+          // Remove from rooms if assigned
+          if (tenant.spaceId) {
+            for (const room of addr.rooms) {
+              const space = room.spaces.find((s) => s.id === tenant.spaceId);
+              if (space) {
+                space.tenant = null;
+              }
             }
           }
           await saveData(projects);
@@ -145,7 +151,11 @@ export default function AddressDetailsScreen() {
           </View>
           <View className="justify-center items-end gap-1">
             <Text className="text-sm font-semibold text-foreground">{item.monthlyPrice} zł</Text>
-            <Text className="text-xs text-muted">Pokój {getRoomName(item.spaceId)}</Text>
+            {item.spaceId ? (
+              <Text className="text-xs text-muted">Pokój {getRoomName(item.spaceId)}</Text>
+            ) : (
+              <Text className="text-xs text-error font-semibold">Bez miejsca</Text>
+            )}
           </View>
         </Pressable>
         <Pressable
@@ -239,9 +249,11 @@ export default function AddressDetailsScreen() {
     );
   };
 
-  const residents = address.rooms.flatMap((room) =>
+  // Combine assigned tenants (from rooms) and unassigned tenants
+  const assignedTenants = address.rooms.flatMap((room) =>
     room.spaces.filter((space) => space.tenant).map((space) => space.tenant!)
   );
+  const residents = [...address.unassignedTenants, ...assignedTenants];
 
   return (
     <ScreenContainer>
