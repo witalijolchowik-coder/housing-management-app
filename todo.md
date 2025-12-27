@@ -521,3 +521,5 @@
 - [x] Fix tenant status not changing from "Bez miejsca" to "Zajęte" after assigning to room
 - [x] Ensure tenant list on address details reflects current room assignment status
 - [x] Verify conflict detection works correctly with updated status
+- [x] Move operator tags to same line as city in project cards (not wrapping to second line)
+- [x] Make occupancy card (Obłożenie 50%) same size as other dashboard cards

@@ -189,11 +189,9 @@ export default function DashboardScreen() {
               <View className="flex-1">
                 <Text className="text-xl font-bold text-foreground">{item.name}</Text>
                 {item.city && (
-                  <Text className="text-sm text-muted mt-1">{item.city}</Text>
-                )}
-                {operatorList.length > 0 && (
-                  <View className="flex-row flex-wrap gap-2 mt-2">
-                    {operatorList.map((operator) => (
+                  <View className="flex-row flex-wrap items-center gap-2 mt-1">
+                    <Text className="text-sm text-muted">{item.city}</Text>
+                    {operatorList.length > 0 && operatorList.map((operator) => (
                       <View
                         key={operator}
                         className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/50"
@@ -266,7 +264,7 @@ export default function DashboardScreen() {
               style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
               className="flex-1"
             >
-              <Card className="p-4 bg-primary items-center">
+              <Card className="p-4 bg-primary items-center justify-center" style={{ minHeight: 88 }}>
                 <Text className="text-white text-xs font-medium">Obłożenie</Text>
                 <Text className="text-white text-3xl font-bold mt-1">{overallStats.occupancyPercent}%</Text>
               </Card>
