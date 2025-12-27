@@ -371,3 +371,16 @@
 - [x] Keep event type badge on right (Zamelowanie, Wypowiedzenie, Wymeldowanie)
 - [x] Changed CalendarEvent interface: roomNumber → roomName
 - [x] All 124 tests passing
+
+
+### Data Export/Import Feature
+- [x] Replace profile icon (person) with three dots menu icon in dashboard header
+- [x] Create settings menu modal with two options: Export and Import
+- [x] Implement data export function (save all data to JSON file)
+- [x] Implement data import function (load data from JSON file)
+- [x] Export includes: projects, addresses, rooms, tenants, eviction archive
+- [x] Import validates JSON structure before loading
+- [x] Add success/error alerts for export/import operations
+- [x] Installed expo-document-picker and expo-sharing packages
+- [x] Created 12 comprehensive tests for export/import functionality
+- [x] All 136 tests passing

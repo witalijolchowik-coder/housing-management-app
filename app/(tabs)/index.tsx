@@ -7,6 +7,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { FAB } from '@/components/ui/fab';
 import { ProjectMenuModal } from '@/components/project-menu-modal';
 import { ProjectFormModal } from '@/components/project-form-modal';
+import { SettingsMenuModal } from '@/components/settings-menu-modal';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Project, ProjectStats, Conflict } from '@/types';
@@ -26,6 +27,7 @@ export default function DashboardScreen() {
   const [formVisible, setFormVisible] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | undefined>();
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -208,12 +210,13 @@ export default function DashboardScreen() {
       <View className="flex-row justify-between items-center mb-8">
         <Text className="text-3xl font-bold text-foreground">{t.dashboard.title}</Text>
         <Pressable
+          onPress={() => setSettingsVisible(true)}
           style={({ pressed }) => ({
             opacity: pressed ? 0.7 : 1,
           })}
           className="bg-surfaceVariant rounded-full p-2"
         >
-          <MaterialIcons name="person" size={24} color={colors.muted} />
+          <MaterialIcons name="more-vert" size={24} color={colors.muted} />
         </Pressable>
       </View>
 
@@ -349,6 +352,12 @@ export default function DashboardScreen() {
           setEditingProject(undefined);
         }}
         onSave={handleSaveProject}
+      />
+
+      <SettingsMenuModal
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
+        onDataChanged={loadProjects}
       />
     </ScreenContainer>
   );
