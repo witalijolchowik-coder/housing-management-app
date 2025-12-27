@@ -515,3 +515,9 @@
 - [x] Format: "Name Surname, 34 года" (comma + age in muted color)
 - [x] Calculate age from birth year (current year - birth year)
 - [x] More intuitive for comparing roommate ages
+
+
+### Bug: Tenant Status Not Updating After Room Assignment
+- [x] Fix tenant status not changing from "Bez miejsca" to "Zajęte" after assigning to room
+- [x] Ensure tenant list on address details reflects current room assignment status
+- [x] Verify conflict detection works correctly with updated status

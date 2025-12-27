@@ -91,7 +91,9 @@ export default function AddressDetailsScreen() {
           if (tenant.spaceId) {
             for (const room of addr.rooms) {
               const space = room.spaces.find((s) => s.id === tenant.spaceId);
-              if (space) {
+              if (space && space.tenant) {
+                // Clear spaceId from tenant before removing
+                space.tenant.spaceId = undefined;
                 space.tenant = null;
                 space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
               }
@@ -492,7 +494,9 @@ export default function AddressDetailsScreen() {
                 if (selectedTenant.spaceId) {
                   for (const room of addr.rooms) {
                     const space = room.spaces.find(s => s.id === selectedTenant.spaceId);
-                    if (space) {
+                    if (space && space.tenant) {
+                      // Clear spaceId before removing tenant
+                      space.tenant.spaceId = undefined;
                       space.tenant = null;
                       space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
                     }
@@ -521,7 +525,9 @@ export default function AddressDetailsScreen() {
             if (selectedTenant.spaceId) {
               for (const room of addr.rooms) {
                 const space = room.spaces.find(s => s.id === selectedTenant.spaceId);
-                if (space) {
+                if (space && space.tenant) {
+                  // Clear spaceId before removing tenant
+                  space.tenant.spaceId = undefined;
                   space.tenant = null;
                   space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
                 }

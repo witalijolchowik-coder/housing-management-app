@@ -112,6 +112,10 @@ export default function SelectTenantScreen() {
             for (const r of addr.rooms) {
               for (const space of r.spaces) {
                 if (space.tenant?.id === tenant.id) {
+                  // Clear spaceId before removing
+                  if (space.tenant) {
+                    space.tenant.spaceId = undefined;
+                  }
                   space.tenant = null;
                   space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
                 }
@@ -121,6 +125,9 @@ export default function SelectTenantScreen() {
             // Find the first available space in the target room and assign tenant
             const availableSpace = room.spaces.find((s) => !s.tenant);
             if (availableSpace) {
+              // Update tenant with spaceId
+              tenant.spaceId = availableSpace.id;
+              
               availableSpace.tenant = tenant;
               availableSpace.status = 'occupied';
               
