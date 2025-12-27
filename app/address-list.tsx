@@ -176,16 +176,18 @@ export default function AddressListScreen() {
               <View className="flex-1 justify-between">
                 <View>
                   <Text className="text-lg font-bold text-foreground">{item.name}</Text>
-                  <Text className="text-sm text-muted mt-2">{item.fullAddress}</Text>
+                  <View className="flex-row items-center gap-2 mt-2 flex-wrap">
+                    <Text className="text-sm text-muted">{item.fullAddress}</Text>
+                    {item.operator && (
+                      <Badge variant="info" size="sm" label={getOperatorName()} />
+                    )}
+                  </View>
                 </View>
                 <View className="flex-col gap-2">
                   <View className="flex-row items-center gap-2">
                     <MaterialIcons name="person" size={16} color={colors.success} />
                     <Text className="text-sm font-semibold text-foreground">{tenantCount}</Text>
                   </View>
-                  {item.operator && (
-                    <Badge variant="info" size="sm" label={getOperatorName()} />
-                  )}
                   {item.status === 'wypowiedzenie' && (
                     <Badge variant="warning" size="sm" label="Wypowiedzenie" />
                   )}

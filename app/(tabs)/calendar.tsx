@@ -1,4 +1,4 @@
-import { View, Text, Pressable, ScrollView, FlatList, Modal } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, FlatList, useWindowDimensions } from 'react-native';
 import { useState, useCallback, useMemo } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
@@ -23,6 +23,9 @@ interface CalendarEvent {
 export default function CalendarScreen() {
   const t = useTranslations();
   const colors = useColors();
+  const { width: screenWidth } = useWindowDimensions();
+  // Calculate cell width: (screen width - padding - gaps) / 7
+  const cellWidth = (screenWidth - 32 - 24) / 7; // 32px padding, 24px gaps (6 * 4px)
   const [projects, setProjects] = useState<Project[]>([]);
   const [evictionArchive, setEvictionArchive] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,10 +156,10 @@ export default function CalendarScreen() {
             setDayDetailsVisible(true);
           }
         }}
-        className={`flex-1 aspect-square rounded-lg items-center justify-center border ${
+        className={`rounded-lg items-center justify-center border ${
           hasEvents ? 'border-primary bg-surface' : 'border-border'
         }`}
-        style={{ minHeight: 60 }}
+        style={{ width: cellWidth, height: cellWidth, minHeight: 60 }}
       >
         <Text className="text-sm font-semibold text-foreground">{day}</Text>
         {hasEvents && (
@@ -181,7 +184,7 @@ export default function CalendarScreen() {
 
     // Empty cells for days before month starts
     for (let i = 0; i < firstDayOfMonth; i++) {
-      days.push(<View key={`empty-${i}`} className="flex-1" style={{ minHeight: 60 }} />);
+      days.push(<View key={`empty-${i}`} style={{ width: cellWidth, height: cellWidth, minHeight: 60 }} />);
     }
 
     // Days of month
@@ -213,7 +216,7 @@ export default function CalendarScreen() {
         {/* Day names */}
         <View className="flex-row gap-1 mb-2">
           {['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'].map((day) => (
-            <View key={day} className="flex-1 items-center">
+            <View key={day} className="items-center" style={{ width: cellWidth }}>
               <Text className="text-xs font-semibold text-muted">{day}</Text>
             </View>
           ))}

@@ -486,3 +486,16 @@
 - [x] Remove "Nazwa firmy" field completely from form
 - [x] Update all references to operator terminology
 - [x] Test form layout and functionality
+
+
+### Address Card Operator Tag Layout
+- [x] Move operator tag to same line as address text (inline with city)
+- [x] Keep tag styling (border, background) but position it on the same row
+- [x] Test layout on different screen sizes
+
+
+### Calendar Last Row Stretching Fix (Round 3)
+- [x] Fix last row cells stretching when row is incomplete
+- [x] Ensure all calendar cells have fixed width and height
+- [x] Prevent flex-grow behavior on calendar cells
+- [x] Test with months that have 28, 29, 30, 31 days
