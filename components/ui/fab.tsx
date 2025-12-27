@@ -9,6 +9,7 @@ export interface FABProps {
   onPress: () => void;
   position?: 'center' | 'right';
   size?: 'sm' | 'md' | 'lg';
+  bottom?: number; // Custom bottom position in pixels
 }
 
 const sizeStyles = {
@@ -23,6 +24,7 @@ export function FAB({
   onPress, 
   position = 'center',
   size = 'md',
+  bottom = 24,
 }: FABProps) {
   const colors = useColors();
   const sizeConfig = sizeStyles[size];
@@ -33,11 +35,12 @@ export function FAB({
       style={({ pressed }) => ({
         transform: [{ scale: pressed ? 0.92 : 1 }],
         opacity: pressed ? 0.9 : 1,
+        bottom,
       })}
       className={cn(
         sizeConfig.button,
         'rounded-full bg-primary items-center justify-center',
-        'absolute bottom-6 shadow-xl',
+        'absolute shadow-xl',
         position === 'center' ? 'self-center' : 'right-6'
       )}
     >

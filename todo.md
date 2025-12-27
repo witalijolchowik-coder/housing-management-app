@@ -526,3 +526,5 @@
 - [x] Fix eviction form - add radio buttons for selecting eviction reason
 - [x] Add date picker calendar to eviction form (replace text input)
 - [x] Add confirmation dialog before eviction (show summary and require confirmation)
+- [x] Fix FAB button position on address list - raise above navigation bar
+- [x] Replace empty image placeholder with styled house icon in address cards

@@ -170,7 +170,7 @@ export default function AddressListScreen() {
                     className="w-full h-full rounded-lg"
                   />
                 ) : (
-                  <MaterialIcons name="image" size={32} color={colors.muted} />
+                  <MaterialIcons name="home" size={40} color={colors.muted} />
                 )}
               </View>
               <View className="flex-1 justify-between">
@@ -262,7 +262,8 @@ export default function AddressListScreen() {
         onPress={() => {
           setEditingAddress(undefined);
           setFormVisible(true);
-        }} 
+        }}
+        bottom={90}
       />
 
       {/* Modals */}
