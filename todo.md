@@ -532,3 +532,5 @@
 - [x] Auto-generate rooms when creating address: empty rooms for regular count, 2-bed rooms for couple count
 - [x] Add validation when adding beds to room - check if total exceeds address totalSpaces limit
 - [x] Show alert with two options: increase address limit or cancel bed addition
+- [x] Add validation when deleting room - check if room has occupied tenants
+- [x] Show warning message if trying to delete room with tenants

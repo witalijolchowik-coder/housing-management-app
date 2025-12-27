@@ -114,7 +114,11 @@ export default function AddressDetailsScreen() {
     if (!address) return;
     const hasOccupiedSpaces = room.spaces.some((space) => space.tenant);
     if (hasOccupiedSpaces) {
-      alert('Nie mozna usunac pokoju z zamelowanymi mieszkancami');
+      Alert.alert(
+        'Nie można usunąć pokoju',
+        'W pokoju znajdują się mieszkańcy. Najpierw wymelduj wszystkich mieszkańców z tego pokoju.',
+        [{ text: 'OK' }]
+      );
       return;
     }
     try {
