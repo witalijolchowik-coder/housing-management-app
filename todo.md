@@ -290,3 +290,15 @@
 - [x] Update room form to include space count field
 - [x] Create edit-room.tsx screen for editing rooms
 - [x] All 124 tests passing
+
+
+### Tenant Details Screen
+- [x] Fix infinite loading when clicking tenant in list
+- [x] Create tenant-details.tsx screen
+- [x] Display personal data (name, surname, gender, birth year)
+- [x] Show current placement (project, address, room, space)
+- [x] Display check-in date and monthly price
+- [x] Show settlement history (previous addresses and projects)
+- [x] Display eviction dates if applicable
+- [x] Fix navigation from tenant list to details
+- [x] All 124 tests passing

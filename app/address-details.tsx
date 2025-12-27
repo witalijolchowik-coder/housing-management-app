@@ -125,8 +125,8 @@ export default function AddressDetailsScreen() {
       <Card className="p-4 mb-3 flex-row gap-3 justify-between items-center">
         <Pressable
           onPress={() => router.push({
-            pathname: '/room-details',
-            params: { projectId, addressId, roomId: item.spaceId },
+            pathname: '/tenant-details',
+            params: { projectId, addressId, tenantId: item.id },
           })}
           style={({ pressed }) => ({
             opacity: pressed ? 0.8 : 1,
