@@ -87,7 +87,7 @@ export const getConflicts = (project: Project): Conflict[] => {
   
   for (const address of project.addresses) {
     // Check unassigned tenants
-    for (const tenant of address.unassignedTenants) {
+    for (const tenant of address.unassignedTenants || []) {
       conflicts.push({
         id: generateId(),
         type: 'no_room',
