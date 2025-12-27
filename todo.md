@@ -362,3 +362,12 @@
 - [x] Test calendar display for different months
 - [x] Verify calendar grid alignment
 - [x] All 124 tests passing
+
+
+### Calendar Event Modal Fixes
+- [x] Add pt-12 padding to calendar event modal to prevent status bar overlap
+- [x] Replace "Miejsce: X" with room name in event details
+- [x] Display format: Name Surname → Project → Address → Room Name (Pokój: ...)
+- [x] Keep event type badge on right (Zamelowanie, Wypowiedzenie, Wymeldowanie)
+- [x] Changed CalendarEvent interface: roomNumber → roomName
+- [x] All 124 tests passing

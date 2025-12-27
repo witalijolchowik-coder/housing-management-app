@@ -17,7 +17,7 @@ interface CalendarEvent {
   projectName: string;
   addressName: string;
   tenantName: string;
-  roomNumber: number | string;
+  roomName?: string;
 }
 
 export default function CalendarScreen() {
@@ -71,7 +71,7 @@ export default function CalendarScreen() {
                 projectName: project.name,
                 addressName: address.name,
                 tenantName: `${space.tenant.firstName} ${space.tenant.lastName}`,
-                roomNumber: space.number,
+                roomName: room.name,
               });
 
               // Wypowiedzenie end event
@@ -83,7 +83,7 @@ export default function CalendarScreen() {
                   projectName: project.name,
                   addressName: address.name,
                   tenantName: `${space.tenant.firstName} ${space.tenant.lastName}`,
-                  roomNumber: space.number,
+                  roomName: room.name,
                 });
               }
             }
@@ -101,7 +101,7 @@ export default function CalendarScreen() {
         projectName: archiveEntry.projectName,
         addressName: archiveEntry.addressName,
         tenantName: `${archiveEntry.firstName} ${archiveEntry.lastName}`,
-        roomNumber: '',
+        roomName: archiveEntry.roomName || undefined,
       });
     }
     
@@ -334,7 +334,7 @@ export default function CalendarScreen() {
         animationType="slide"
         onRequestClose={() => setDayDetailsVisible(false)}
       >
-        <View className="flex-1 bg-background">
+        <View className="flex-1 bg-background pt-12">
           {/* Header */}
           <View className="flex-row items-center justify-between px-4 py-4 border-b border-border">
             <Pressable onPress={() => setDayDetailsVisible(false)}>
@@ -376,8 +376,8 @@ export default function CalendarScreen() {
                       }
                     />
                   </View>
-                  {item.roomNumber && (
-                    <Text className="text-sm text-foreground">Miejsce: {item.roomNumber}</Text>
+                  {item.roomName && (
+                    <Text className="text-sm text-foreground">Pokój: {item.roomName}</Text>
                   )}
                 </View>
               </Card>
