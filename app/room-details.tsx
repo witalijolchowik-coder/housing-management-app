@@ -1,6 +1,6 @@
 import { ScrollView, Text, View, FlatList, Pressable, Modal, TouchableOpacity, Alert } from 'react-native';
-import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState, useCallback } from 'react';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,13 @@ export default function RoomDetailsScreen() {
   useEffect(() => {
     loadRoom();
   }, [projectId, addressId, roomId]);
+
+  // Reload data when screen becomes active (after returning from select-tenant, etc.)
+  useFocusEffect(
+    useCallback(() => {
+      loadRoom();
+    }, [projectId, addressId, roomId])
+  );
 
   const loadRoom = async () => {
     try {

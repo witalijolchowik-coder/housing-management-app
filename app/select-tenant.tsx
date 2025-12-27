@@ -113,6 +113,7 @@ export default function SelectTenantScreen() {
               for (const space of r.spaces) {
                 if (space.tenant?.id === tenant.id) {
                   space.tenant = null;
+                  space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
                 }
               }
             }
@@ -121,6 +122,7 @@ export default function SelectTenantScreen() {
             const availableSpace = room.spaces.find((s) => !s.tenant);
             if (availableSpace) {
               availableSpace.tenant = tenant;
+              availableSpace.status = 'occupied';
               await saveData(projects);
               router.back();
             }

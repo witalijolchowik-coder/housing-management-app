@@ -1,6 +1,6 @@
 import { ScrollView, Text, View, FlatList, Pressable, Image, Modal, Alert } from 'react-native';
-import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState, useCallback } from 'react';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +28,13 @@ export default function AddressDetailsScreen() {
   useEffect(() => {
     loadAddress();
   }, [projectId, addressId]);
+
+  // Reload data when screen becomes active (after returning from add-tenant, etc.)
+  useFocusEffect(
+    useCallback(() => {
+      loadAddress();
+    }, [projectId, addressId])
+  );
 
   const loadAddress = async () => {
     try {
@@ -82,6 +89,7 @@ export default function AddressDetailsScreen() {
               const space = room.spaces.find((s) => s.id === tenant.spaceId);
               if (space) {
                 space.tenant = null;
+                space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
               }
             }
           }

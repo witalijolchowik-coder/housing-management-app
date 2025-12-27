@@ -397,3 +397,28 @@
 - [x] Updated demo data with operators for all projects
 - [x] Created 12 comprehensive tests for operator tags
 - [x] All 148 tests passing
+
+### 🔴 CRITICAL: State Synchronization Bug
+- [x] UI doesn't update immediately after adding tenant (requires app restart)
+- [x] Assigning tenant to space doesn't update statistics
+- [x] Occupied spaces show as 0/7 instead of actual count
+- [x] Occupancy percentage stays at 0% instead of calculating correctly
+- [x] Tenant appears in conflicts even when assigned to space
+- [x] Root cause: AsyncStorage saves data but React state doesn't refresh
+- [x] Solution: Added useFocusEffect to address-details.tsx and room-details.tsx
+- [x] Fixed space.status not updating when tenant is assigned (select-tenant.tsx line 125)
+- [x] Fixed space.status not updating when tenant is removed (address-details.tsx line 92)
+- [x] Statistics now recalculate correctly after state changes
+- [x] All 148 tests passing
+
+
+### 🔴 CRITICAL: State Synchronization Bug
+- [ ] Fix addTenant not updating UI immediately (requires app restart to see new tenant)
+- [ ] Fix assignTenantToSpace not updating statistics (occupied count stays 0)
+- [ ] Fix occupancy percentage not recalculating after tenant assignment
+- [ ] Fix conflict detection showing assigned tenants as "without place"
+- [ ] Ensure all state changes trigger immediate UI refresh
+- [ ] Verify AsyncStorage saves are followed by state updates
+- [ ] Test: Add tenant → should appear immediately in list
+- [ ] Test: Assign tenant to space → statistics should update immediately (1/7, ~14%)
+- [ ] Test: Dashboard should show correct occupied/free counts
