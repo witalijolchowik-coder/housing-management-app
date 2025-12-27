@@ -91,6 +91,11 @@ export default function AddressDetailsScreen() {
 
   const handleDeleteRoom = async (room: Room) => {
     if (!address) return;
+    const hasOccupiedSpaces = room.spaces.some((space) => space.tenant);
+    if (hasOccupiedSpaces) {
+      alert('Nie mozna usunac pokoju z zamelowanymi mieszkancami');
+      return;
+    }
     try {
       const projects = await loadData();
       const project = projects.find((p) => p.id === projectId);
@@ -305,10 +310,19 @@ export default function AddressDetailsScreen() {
 
       {/* FAB Button */}
       <Pressable
-        onPress={() => router.push({
-          pathname: '/add-tenant',
-          params: { projectId, addressId },
-        })}
+        onPress={() => {
+          if (activeTab === 'residents') {
+            router.push({
+              pathname: '/add-tenant',
+              params: { projectId, addressId },
+            });
+          } else {
+            router.push({
+              pathname: '/add-room',
+              params: { projectId, addressId },
+            });
+          }
+        }}
         className="absolute bottom-20 right-4 w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg"
         style={({ pressed }) => ({
           opacity: pressed ? 0.8 : 1,

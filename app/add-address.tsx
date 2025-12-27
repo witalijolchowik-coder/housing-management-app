@@ -1,10 +1,11 @@
-import { ScrollView, Text, View, Pressable, TextInput } from 'react-native';
+import { ScrollView, Text, View, Pressable, TextInput, Alert } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
+import { Address, Room, Space } from '@/types';
 import { MaterialIcons } from '@expo/vector-icons';
 import { loadData, saveData } from '@/lib/store';
 
@@ -24,6 +25,7 @@ export default function AddAddressScreen() {
 
   const [name, setName] = useState('');
   const [fullAddress, setFullAddress] = useState('');
+  const [totalRooms, setTotalRooms] = useState('0');
   const [coupleRooms, setCoupleRooms] = useState('0');
   const [companyName, setCompanyName] = useState('');
   const [ownerName, setOwnerName] = useState('');
@@ -32,7 +34,13 @@ export default function AddAddressScreen() {
 
   const handleSubmit = async () => {
     if (!name || !fullAddress || !companyName || !ownerName || !phone) {
-      alert(t.messages.savingError);
+      Alert.alert('Błąd', 'Proszę wypełnić wszystkie wymagane pola');
+      return;
+    }
+
+    const roomCount = parseInt(totalRooms) || 0;
+    if (roomCount <= 0) {
+      Alert.alert('Błąd', 'Liczba pokoi musi być większa niż 0');
       return;
     }
 
@@ -42,11 +50,26 @@ export default function AddAddressScreen() {
       
       // Add to first project (or create if none exists)
       if (projects.length === 0) {
-        alert('Brak projektów. Proszę najpierw utworzyć projekt.');
+        Alert.alert('Błąd', 'Brak projektów. Proszę najpierw utworzyć projekt.');
         return;
       }
 
-      const newAddress: any = {
+      // Generate empty rooms
+      const rooms: Room[] = [];
+      for (let i = 1; i <= roomCount; i++) {
+        const roomId = generateUUID();
+        const room: Room = {
+          id: roomId,
+          addressId: '', // Will be set below
+          name: `Pokój ${i}`,
+          type: 'male', // Default type
+          totalSpaces: 0,
+          spaces: [],
+        };
+        rooms.push(room);
+      }
+
+      const newAddress: Address = {
         id: generateUUID(),
         projectId: projects[0].id,
         name,
@@ -59,23 +82,32 @@ export default function AddAddressScreen() {
         evictionPeriod: 14,
         totalCost: 0,
         pricePerSpace: 0,
-        rooms: [],
+        rooms: rooms.map((r) => ({
+          ...r,
+          addressId: '', // Placeholder, will be set properly
+        })),
         photos: [],
       };
+
+      // Set addressId for all rooms
+      newAddress.rooms.forEach((room) => {
+        room.addressId = newAddress.id;
+      });
 
       projects[0].addresses.push(newAddress);
       await saveData(projects);
 
+      Alert.alert('Sukces', `Adres dodany z ${roomCount} pokojami`);
       router.back();
     } catch (error) {
       console.error('Error adding address:', error);
-      alert(t.messages.savingError);
+      Alert.alert('Błąd', 'Nie udało się dodać adresu');
     } finally {
       setLoading(false);
     }
   };
 
-  const FormField = ({ label, value, onChangeText, placeholder, multiline = false }: any) => (
+  const FormField = ({ label, value, onChangeText, placeholder, multiline = false, keyboardType = 'default' }: any) => (
     <View className="gap-2 mb-4">
       <Text className="text-sm font-semibold text-foreground">{label}</Text>
       <TextInput
@@ -84,6 +116,7 @@ export default function AddAddressScreen() {
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
         multiline={multiline}
+        keyboardType={keyboardType}
         className="bg-surfaceVariant rounded-lg px-4 py-3 text-foreground"
       />
     </View>
@@ -100,20 +133,20 @@ export default function AddAddressScreen() {
           >
             <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
           </Pressable>
-          <Text className="text-2xl font-bold text-foreground flex-1">{t.addressList.addNewAddress}</Text>
+          <Text className="text-2xl font-bold text-foreground flex-1">Dodaj adres</Text>
         </View>
 
         {/* Form */}
         <Card className="p-6 gap-4">
           <FormField
-            label={t.addressList.title}
+            label="Nazwa adresu *"
             value={name}
             onChangeText={setName}
             placeholder="np. Apartamenty Centrum"
           />
 
           <FormField
-            label="Pełny adres"
+            label="Pełny adres *"
             value={fullAddress}
             onChangeText={setFullAddress}
             placeholder="ul. Główna 123, Warszawa"
@@ -121,32 +154,48 @@ export default function AddAddressScreen() {
           />
 
           <FormField
-            label={t.addressList.coupleRooms}
-            value={coupleRooms}
-            onChangeText={setCoupleRooms}
-            placeholder="0"
+            label="Liczba pokoi *"
+            value={totalRooms}
+            onChangeText={setTotalRooms}
+            placeholder="4"
+            keyboardType="number-pad"
           />
 
           <FormField
-            label="Nazwa firmy"
+            label="Pokoje dla par (opcjonalnie)"
+            value={coupleRooms}
+            onChangeText={setCoupleRooms}
+            placeholder="0"
+            keyboardType="number-pad"
+          />
+
+          <FormField
+            label="Nazwa firmy *"
             value={companyName}
             onChangeText={setCompanyName}
             placeholder="np. Zarządzanie Nieruchomościami Sp. z o.o."
           />
 
           <FormField
-            label="Imię i nazwisko właściciela"
+            label="Imię i nazwisko właściciela *"
             value={ownerName}
             onChangeText={setOwnerName}
             placeholder="Jan Kowalski"
           />
 
           <FormField
-            label="Numer telefonu"
+            label="Numer telefonu *"
             value={phone}
             onChangeText={setPhone}
             placeholder="+48 123 456 789"
           />
+
+          {/* Info Box */}
+          <View className="bg-surface rounded-lg p-3 border border-primary/30">
+            <Text className="text-xs text-muted">
+              💡 Po utworzeniu adresu pojawi się {totalRooms || '0'} pokoi: Pokój 1, Pokój 2, itd. Możesz je edytować lub usuwać.
+            </Text>
+          </View>
 
           {/* Submit Button */}
           <Pressable
@@ -157,8 +206,8 @@ export default function AddAddressScreen() {
             })}
             className="bg-primary rounded-lg px-6 py-4 items-center mt-4"
           >
-            <Text className="text-foreground font-semibold text-base">
-              {loading ? t.common.loading : t.common.save}
+            <Text className="text-background font-semibold text-base">
+              {loading ? 'Ładowanie...' : 'Dodaj adres'}
             </Text>
           </Pressable>
         </Card>

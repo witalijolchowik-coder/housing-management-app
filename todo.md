@@ -165,3 +165,12 @@
 - [x] Add date pickers for check-in and work start dates
 - [x] Create DatePicker component with calendar UI
 - [x] Write and pass 22 unit tests for new features
+
+
+### Auto-Room Creation Feature
+- [x] Update add-address form to include room count field
+- [x] Auto-generate empty rooms when creating address
+- [x] Rooms appear as "Pokój 1", "Pokój 2", etc. in Pokoje tab
+- [x] Allow deletion of auto-created rooms (with safety check)
+- [x] Allow adding new rooms via FAB button
+- [x] Write tests for room auto-generation (10 tests passing)
