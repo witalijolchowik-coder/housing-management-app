@@ -1,6 +1,6 @@
-import { ScrollView, Text, View, Pressable, TextInput, Alert } from 'react-native';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { View, Text, TextInput, ScrollView, Pressable, Alert } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -9,6 +9,14 @@ import { useColors } from '@/hooks/use-colors';
 import { Gender, Tenant } from '@/types';
 import { MaterialIcons } from '@expo/vector-icons';
 import { loadData, saveData } from '@/lib/store';
+
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
 
 export default function AddTenantScreen() {
   const t = useTranslations();
@@ -19,26 +27,20 @@ export default function AddTenantScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [gender, setGender] = useState<Gender>('male');
-  const [birthYear, setBirthYear] = useState('');
+  const [birthYear, setBirthYear] = useState(new Date().getFullYear() - 30);
   const [checkInDate, setCheckInDate] = useState('');
   const [workStartDate, setWorkStartDate] = useState('');
   const [monthlyPrice, setMonthlyPrice] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const generateUUID = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!firstName.trim() || !lastName.trim() || !checkInDate || !monthlyPrice.trim()) {
       Alert.alert('Błąd', 'Proszę wypełnić wszystkie wymagane pola');
       return;
     }
 
     try {
+      setLoading(true);
       const projects = await loadData();
       const project = projects.find((p) => p.id === projectId);
       
@@ -53,41 +55,34 @@ export default function AddTenantScreen() {
         return;
       }
 
-      // Create new tenant
+      // Create new tenant WITHOUT room assignment
       const newTenant: Tenant = {
         id: generateUUID(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         gender,
-        birthYear: birthYear.trim() ? parseInt(birthYear.trim()) : new Date().getFullYear() - 30,
+        birthYear,
         checkInDate,
         workStartDate: workStartDate || undefined,
         monthlyPrice: parseFloat(monthlyPrice) || 0,
       };
 
-      // Add tenant to first available space in address
-      let assigned = false;
-      for (const room of address.rooms) {
-        for (const space of room.spaces) {
-          if (!space.tenant) {
-            space.tenant = newTenant;
-            assigned = true;
-            break;
-          }
-        }
-        if (assigned) break;
-      }
+      // Tenant is added without space assignment (spaceId is undefined)
+      // It will appear in the tenant list with status "Bez miejsca"
+      // User can later assign it to a space from the Pokoje tab
 
       await saveData(projects);
-      Alert.alert('Sukces', assigned ? 'Mieszkaniec dodany i przydzielony do pokoju' : 'Mieszkaniec dodany (brak wolnych miejsc)');
+      Alert.alert('Sukces', `Mieszkaniec "${firstName} ${lastName}" dodany bez miejsca`);
       router.back();
     } catch (error) {
       console.error('Error adding tenant:', error);
       Alert.alert('Błąd', 'Nie udało się dodać mieszkańca');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [firstName, lastName, gender, birthYear, checkInDate, workStartDate, monthlyPrice, projectId, addressId]);
 
-  const FormField = ({ label, value, onChangeText, placeholder, multiline = false, keyboardType = 'default' }: any) => (
+  const FormField = useCallback(({ label, value, onChangeText, placeholder, multiline = false, keyboardType = 'default', editable = true }: any) => (
     <View className="gap-2 mb-4">
       <Text className="text-sm font-semibold text-foreground">{label}</Text>
       <TextInput
@@ -97,10 +92,14 @@ export default function AddTenantScreen() {
         placeholderTextColor={colors.muted}
         multiline={multiline}
         keyboardType={keyboardType}
+        editable={editable}
         className="bg-surfaceVariant rounded-lg px-4 py-3 text-foreground"
       />
     </View>
-  );
+  ), [colors]);
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 100 }, (_, i) => currentYear - 80 + i);
 
   return (
     <ScreenContainer className="p-4 pt-12 pb-20">
@@ -118,90 +117,109 @@ export default function AddTenantScreen() {
 
         {/* Form */}
         <Card className="p-6 gap-4">
-          {/* Name Fields */}
+          {/* First Name */}
           <FormField
-            label="Imię"
+            label="Imię *"
             value={firstName}
             onChangeText={setFirstName}
-            placeholder="Jan"
-          />
-          <FormField
-            label="Nazwisko"
-            value={lastName}
-            onChangeText={setLastName}
-            placeholder="Kowalski"
+            placeholder="np. Jan"
           />
 
-          {/* Gender Selection - Only Male/Female */}
+          {/* Last Name */}
+          <FormField
+            label="Nazwisko *"
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="np. Kowalski"
+          />
+
+          {/* Gender */}
           <View className="gap-2 mb-4">
-            <Text className="text-sm font-semibold text-foreground">Płeć</Text>
-            <View className="flex-row gap-2">
-              <Pressable
-                onPress={() => setGender('male')}
-                className={`flex-1 rounded-lg py-3 items-center ${
-                  gender === 'male' ? 'bg-primary' : 'bg-surface border border-border'
-                }`}
-              >
-                <Text className={`font-semibold ${gender === 'male' ? 'text-background' : 'text-foreground'}`}>
-                  ♂ Mężczyzna
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setGender('female')}
-                className={`flex-1 rounded-lg py-3 items-center ${
-                  gender === 'female' ? 'bg-primary' : 'bg-surface border border-border'
-                }`}
-              >
-                <Text className={`font-semibold ${gender === 'female' ? 'text-background' : 'text-foreground'}`}>
-                  ♀ Kobieta
-                </Text>
-              </Pressable>
+            <Text className="text-sm font-semibold text-foreground">Płeć *</Text>
+            <View className="flex-row gap-3">
+              {(['male', 'female'] as const).map((g) => (
+                <Pressable
+                  key={g}
+                  onPress={() => setGender(g)}
+                  className={`flex-1 rounded-lg py-3 items-center ${
+                    gender === g ? 'bg-primary' : 'bg-surfaceVariant'
+                  }`}
+                >
+                  <Text className={gender === g ? 'text-white font-semibold' : 'text-foreground'}>
+                    {g === 'male' ? 'Mężczyzna' : 'Kobieta'}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </View>
 
-          {/* Birth Year */}
-          <FormField
-            label="Rok urodzenia (opcjonalnie)"
-            value={birthYear}
-            onChangeText={setBirthYear}
-            placeholder="1990"
-            keyboardType="number-pad"
-          />
+          {/* Birth Year Picker */}
+          <View className="gap-2 mb-4">
+            <Text className="text-sm font-semibold text-foreground">Rok urodzenia</Text>
+            <View className="bg-surfaceVariant rounded-lg overflow-hidden">
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 8 }}
+                className="py-2"
+              >
+                {yearOptions.map((year) => (
+                  <Pressable
+                    key={year}
+                    onPress={() => setBirthYear(year)}
+                    className={`px-3 py-2 rounded-lg mx-1 ${
+                      birthYear === year ? 'bg-primary' : 'bg-surface'
+                    }`}
+                  >
+                    <Text className={birthYear === year ? 'text-white font-semibold' : 'text-foreground'}>
+                      {year}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
 
-          {/* Check-in Date - Required */}
-          <DatePicker
-            value={checkInDate}
-            onChange={setCheckInDate}
-            label="Data zamelowania *"
-            placeholder="Wybierz datę"
-          />
+          {/* Check-in Date */}
+          <View className="gap-2 mb-4">
+            <Text className="text-sm font-semibold text-foreground">Data zamelowania *</Text>
+            <DatePicker
+              value={checkInDate}
+              onChange={setCheckInDate}
+              placeholder="Wybierz datę"
+            />
+          </View>
 
-          {/* Work Start Date - Optional */}
-          <DatePicker
-            value={workStartDate}
-            onChange={setWorkStartDate}
-            label="Data rozpoczęcia pracy (opcjonalnie)"
-            placeholder="Wybierz datę"
-          />
+          {/* Work Start Date */}
+          <View className="gap-2 mb-4">
+            <Text className="text-sm font-semibold text-foreground">Data rozpoczęcia pracy</Text>
+            <DatePicker
+              value={workStartDate}
+              onChange={setWorkStartDate}
+              placeholder="Wybierz datę (opcjonalnie)"
+            />
+          </View>
 
           {/* Monthly Price */}
           <FormField
             label="Cena miesięczna (zł) *"
             value={monthlyPrice}
             onChangeText={setMonthlyPrice}
-            placeholder="500"
+            placeholder="np. 500"
             keyboardType="decimal-pad"
           />
 
           {/* Submit Button */}
           <Pressable
             onPress={handleSubmit}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.9 : 1,
-            })}
-            className="bg-primary rounded-lg px-6 py-4 items-center mt-4"
+            disabled={loading}
+            className={`rounded-lg py-3 items-center mt-4 ${
+              loading ? 'bg-muted' : 'bg-primary'
+            }`}
           >
-            <Text className="text-background font-semibold text-base">Dodaj mieszkańca</Text>
+            <Text className="text-white font-semibold">
+              {loading ? 'Dodawanie...' : 'Dodaj mieszkańca'}
+            </Text>
           </Pressable>
         </Card>
       </ScrollView>

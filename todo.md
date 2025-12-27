@@ -234,3 +234,12 @@
 - [x] Fix address-menu-modal.tsx padding (pt-12 pb-20)
 - [x] Fix project-menu-modal.tsx padding (pt-12 pb-20)
 - [ ] Test all forms on Android device
+
+
+### Tenant Form Fixes
+- [x] Fix TextInput keyboard disappearing after each character (added editable={true}, useCallback)
+- [x] Replace birth year with year picker/scroll (100 years to choose from)
+- [x] Fix work start date to allow future years (not limited to current year)
+- [x] Fix tenant creation logic - add tenant without room assignment (status "Bez miejsca")
+- [x] Tenant appears in list immediately after creation
+- [ ] Test form on Android device
