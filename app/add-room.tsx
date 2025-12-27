@@ -73,8 +73,8 @@ export default function AddRoomScreen() {
   };
 
   return (
-    <ScreenContainer className="p-4">
-      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+    <ScreenContainer className="p-4 pt-12 pb-20">
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
         <View className="flex-row items-center gap-3 mb-6">
           <Pressable

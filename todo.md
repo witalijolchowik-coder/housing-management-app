@@ -222,3 +222,15 @@
 - [x] Display operator tag on address cards under address name
 - [x] Fix form padding - prevent overlap with status bar and bottom navigation (pt-12 pb-20)
 - [x] Write and pass 20 tests for operator selection (75 total tests passing)
+
+
+### Global Safe Area Padding Fix
+- [x] Fix add-address.tsx form padding (pt-12 pb-20)
+- [x] Fix add-tenant.tsx form padding (pt-12 pb-20)
+- [x] Fix add-room.tsx form padding (pt-12 pb-20)
+- [x] Fix address-form-modal.tsx padding (pt-12 pb-20)
+- [x] Fix eviction-form-modal.tsx padding (pt-12 pb-20)
+- [x] Fix project-form-modal.tsx padding (pt-12 pb-20)
+- [x] Fix address-menu-modal.tsx padding (pt-12 pb-20)
+- [x] Fix project-menu-modal.tsx padding (pt-12 pb-20)
+- [ ] Test all forms on Android device

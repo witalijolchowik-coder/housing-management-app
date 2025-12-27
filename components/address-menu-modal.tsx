@@ -36,7 +36,7 @@ export function AddressMenuModal({
       onRequestClose={onClose}
     >
       <Pressable
-        className="flex-1 bg-black/50"
+        className="flex-1 bg-black/50 pt-12 pb-20"
         onPress={onClose}
       >
         <View className="flex-1 justify-center items-center">

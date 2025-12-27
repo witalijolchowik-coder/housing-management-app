@@ -59,7 +59,7 @@ export function ProjectFormModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-background">
+      <View className="flex-1 bg-background pt-12 pb-20">
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 py-4 border-b border-border">
           <Pressable onPress={onClose}>
