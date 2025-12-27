@@ -134,6 +134,7 @@ export default function RoomDetailsScreen() {
                 const startDate = new Date();
                 const endDate = new Date(startDate);
                 endDate.setDate(endDate.getDate() + wypowiedzenieDays);
+                s.status = 'wypowiedzenie';
                 s.wypowiedzenie = {
                   startDate: startDate.toISOString().split('T')[0],
                   endDate: endDate.toISOString().split('T')[0],
@@ -142,6 +143,8 @@ export default function RoomDetailsScreen() {
                 };
               } else {
                 s.wypowiedzenie = undefined;
+                // Restore status based on tenant presence
+                s.status = s.tenant ? 'occupied' : 'vacant';
               }
               await saveData(projects);
               await loadRoom();

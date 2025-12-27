@@ -314,3 +314,16 @@
 - [x] Test filtering with different room types
 - [x] Test progress bar calculations
 - [x] All 124 tests passing
+
+
+### Eviction (Wypowiedzenie) Logic Fix
+- [x] Add evictionDate field to Space type (already existed as Wypowiedzenie.endDate)
+- [x] Update conflict detection: only conflict if evictionDate < today AND tenant exists
+- [x] During eviction period (evictionDate > today): NOT a conflict, even if occupied
+- [x] When evictionDate expires: remove space from room if empty, or mark as conflict if occupied
+- [x] Update room-details screen to show eviction date (already implemented)
+- [x] Add eviction date calculation (default +14 days) (already implemented)
+- [x] Fixed: space.status now set to 'wypowiedzenie' when putting on eviction
+- [x] Fixed: space.status restored when removing eviction
+- [x] Conflict detection now works correctly: only triggers when endDate < today AND tenant exists
+- [x] All 124 tests passing
