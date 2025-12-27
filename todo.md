@@ -191,3 +191,15 @@
 - [x] Simplify Reports tab to show only project reports with download buttons
 - [x] Dashboard shows: Obłożenie, Razem miejsc, Zajęte, Wolne, Na wypowiedzeniu, Konflikty, Całkowity koszt
 - [x] Reports tab shows: Project name, occupancy %, progress bar, stats, download button
+
+
+### Material Design 3 Visual Redesign
+- [x] Update theme colors (modern blue, deeper dark, better contrast)
+- [x] Redesign Card component (elevated, filled, outlined variants)
+- [x] Improve FAB component (better shadows, white icons)
+- [x] Update Badge component (semi-transparent backgrounds, colored text)
+- [x] Enhance ProgressBar (larger height for visibility)
+- [x] Improve dashboard spacing and visual hierarchy
+- [x] Enhance project cards (larger text, better dividers)
+- [x] Improve address cards (larger photos, better padding)
+- [x] All 42 tests passing, no functionality broken

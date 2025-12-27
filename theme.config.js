@@ -1,31 +1,31 @@
 /** @type {const} */
 const themeColors = {
-  // Primary accent - blue for toggles, active states
-  primary: { light: '#6C8EEF', dark: '#6C8EEF' },
+  // Primary - Modern blue (Material Design 3)
+  primary: { light: '#5B9EFF', dark: '#5B9EFF' },
   
-  // Backgrounds
-  background: { light: '#121212', dark: '#121212' },
-  surface: { light: '#1E1E2E', dark: '#1E1E2E' },
-  surfaceVariant: { light: '#2A2A3A', dark: '#2A2A3A' },
+  // Backgrounds - Deep dark for dark theme
+  background: { light: '#0F0F1A', dark: '#0F0F1A' },
+  surface: { light: '#1A1A2E', dark: '#1A1A2E' },
+  surfaceVariant: { light: '#252540', dark: '#252540' },
   
-  // Text colors
-  foreground: { light: '#E8E8E8', dark: '#E8E8E8' },
-  muted: { light: '#9BA1A6', dark: '#9BA1A6' },
+  // Text colors - High contrast
+  foreground: { light: '#F5F5F7', dark: '#F5F5F7' },
+  muted: { light: '#8B92A0', dark: '#8B92A0' },
   
-  // Border
-  border: { light: '#334155', dark: '#334155' },
+  // Border - Subtle dividers
+  border: { light: '#2D2D42', dark: '#2D2D42' },
   
-  // Status colors
-  success: { light: '#4ADE80', dark: '#4ADE80' },  // Free/Vacant - green
-  warning: { light: '#FBBF24', dark: '#FBBF24' },  // Wypowiedzenie - yellow/orange
-  error: { light: '#F87171', dark: '#F87171' },    // Conflict/Overdue - red
+  // Status colors - Material Design 3
+  success: { light: '#4ADE80', dark: '#4ADE80' },      // Free/Vacant - green
+  warning: { light: '#FFB84D', dark: '#FFB84D' },      // Wypowiedzenie - amber
+  error: { light: '#FF6B6B', dark: '#FF6B6B' },        // Conflict/Overdue - red
   
   // Additional status
-  occupied: { light: '#6C8EEF', dark: '#6C8EEF' }, // Occupied - blue
+  occupied: { light: '#5B9EFF', dark: '#5B9EFF' },     // Occupied - blue
   
   // Card backgrounds
-  card: { light: '#1E1E2E', dark: '#1E1E2E' },
-  cardHover: { light: '#252535', dark: '#252535' },
+  card: { light: '#1A1A2E', dark: '#1A1A2E' },
+  cardHover: { light: '#252540', dark: '#252540' },
 };
 
 module.exports = { themeColors };

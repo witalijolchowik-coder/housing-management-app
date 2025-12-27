@@ -8,11 +8,19 @@ export interface BadgeProps extends ViewProps {
 }
 
 const variantStyles = {
-  success: 'bg-success',
-  warning: 'bg-warning',
-  error: 'bg-error',
-  info: 'bg-primary',
-  default: 'bg-surfaceVariant',
+  success: 'bg-success/20 border border-success/50',
+  warning: 'bg-warning/20 border border-warning/50',
+  error: 'bg-error/20 border border-error/50',
+  info: 'bg-primary/20 border border-primary/50',
+  default: 'bg-surfaceVariant border border-border/50',
+};
+
+const textColorStyles = {
+  success: 'text-success',
+  warning: 'text-warning',
+  error: 'text-error',
+  info: 'text-primary',
+  default: 'text-foreground',
 };
 
 const sizeStyles = {
@@ -44,7 +52,7 @@ export function Badge({
       )}
       {...props}
     >
-      <Text className={cn('font-semibold text-foreground', textSizeStyles[size])}>
+      <Text className={cn('font-semibold', textColorStyles[variant], textSizeStyles[size])}>
         {label}
       </Text>
     </View>

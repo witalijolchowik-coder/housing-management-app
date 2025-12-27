@@ -144,11 +144,11 @@ export default function AddressListScreen() {
           opacity: pressed ? 0.8 : 1,
         })}
       >
-        <Card className="p-4 mb-4 overflow-hidden">
-          <View className="gap-3">
+        <Card className="p-5 mb-4 overflow-hidden">
+          <View className="gap-4">
             {/* Photo and Header */}
-            <View className="flex-row gap-3">
-              <View className="w-20 h-20 rounded-lg bg-surfaceVariant items-center justify-center">
+            <View className="flex-row gap-4">
+              <View className="w-24 h-24 rounded-2xl bg-surfaceVariant items-center justify-center">
                 {item.photos && item.photos.length > 0 ? (
                   <Image
                     source={{ uri: item.photos[0] }}
@@ -160,8 +160,8 @@ export default function AddressListScreen() {
               </View>
               <View className="flex-1 justify-between">
                 <View>
-                  <Text className="text-base font-bold text-foreground">{item.name}</Text>
-                  <Text className="text-xs text-muted mt-1">{item.fullAddress}</Text>
+                  <Text className="text-lg font-bold text-foreground">{item.name}</Text>
+                  <Text className="text-sm text-muted mt-2">{item.fullAddress}</Text>
                 </View>
                 <View className="flex-row gap-1">
                   {item.coupleRooms > 0 && (
@@ -175,7 +175,7 @@ export default function AddressListScreen() {
             </View>
 
             {/* Statistics */}
-            <View className="gap-2">
+            <View className="gap-3 pt-3 border-t border-border/30">
               <View className="flex-row justify-between items-center">
                 <Text className="text-sm text-muted">
                   {stats.occupied + stats.wypowiedzenie}/{stats.total} {t.addressList.occupied}
@@ -186,13 +186,13 @@ export default function AddressListScreen() {
             </View>
 
             {/* Badges */}
-            <View className="flex-row flex-wrap gap-2 items-center">
+            <View className="flex-row flex-wrap gap-3 items-center">
               {hasEvictions && (
                 <Badge variant="warning" size="sm" label={`${stats.wypowiedzenie} ${t.roomDetails.eviction}`} />
               )}
               <Pressable
                 onPress={() => handleAddressMenu(item)}
-                className="ml-auto bg-surfaceVariant rounded-full p-2"
+                className="ml-auto bg-surfaceVariant/60 rounded-full p-2.5"
               >
                 <MaterialIcons name="more-vert" size={20} color={colors.muted} />
               </Pressable>

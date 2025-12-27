@@ -11,7 +11,7 @@ export interface ProgressBarProps {
 
 export function ProgressBar({
   progress,
-  height = 4,
+  height = 6,
   color = 'bg-primary',
   backgroundColor = 'bg-surfaceVariant',
   className,

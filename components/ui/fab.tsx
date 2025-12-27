@@ -31,18 +31,19 @@ export function FAB({
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        transform: [{ scale: pressed ? 0.95 : 1 }],
+        transform: [{ scale: pressed ? 0.92 : 1 }],
+        opacity: pressed ? 0.9 : 1,
       })}
       className={cn(
         sizeConfig.button,
         'rounded-full bg-primary items-center justify-center',
-        'absolute bottom-6',
+        'absolute bottom-6 shadow-xl',
         position === 'center' ? 'self-center' : 'right-6'
       )}
     >
-      <MaterialIcons name={icon as any} size={sizeConfig.icon} color={colors.foreground} />
+      <MaterialIcons name={icon as any} size={sizeConfig.icon} color="white" />
       {label && (
-        <Text className="text-foreground text-xs font-semibold mt-1">{label}</Text>
+        <Text className="text-white text-xs font-semibold mt-1">{label}</Text>
       )}
     </Pressable>
   );

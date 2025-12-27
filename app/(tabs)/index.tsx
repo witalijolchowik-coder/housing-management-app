@@ -141,28 +141,28 @@ export default function DashboardScreen() {
           opacity: pressed ? 0.8 : 1,
         })}
       >
-        <Card className="p-4 mb-4">
-          <View className="gap-3">
+        <Card className="p-5 mb-4">
+          <View className="gap-4">
             {/* Header */}
             <View className="flex-row justify-between items-start">
               <View className="flex-1">
-                <Text className="text-lg font-bold text-foreground">{item.name}</Text>
+                <Text className="text-xl font-bold text-foreground">{item.name}</Text>
                 {item.city && (
                   <Text className="text-sm text-muted mt-1">{item.city}</Text>
                 )}
               </View>
               <Pressable
                 onPress={() => handleProjectMenu(item)}
-                className="bg-surfaceVariant rounded-full p-2"
+                className="bg-surfaceVariant/60 rounded-full p-2.5"
               >
                 <MaterialIcons name="more-vert" size={20} color={colors.muted} />
               </Pressable>
             </View>
 
             {/* Occupancy */}
-            <View className="gap-1">
+            <View className="gap-2">
               <View className="flex-row justify-between items-center">
-                <Text className="text-3xl font-bold text-primary">{stats.occupancyPercent}%</Text>
+                <Text className="text-4xl font-bold text-primary">{stats.occupancyPercent}%</Text>
                 <Text className="text-sm text-muted">
                   {stats.occupied}/{stats.total} {t.addressList.occupied}
                 </Text>
@@ -171,7 +171,7 @@ export default function DashboardScreen() {
             </View>
 
             {/* Badges */}
-            <View className="flex-row flex-wrap gap-2">
+            <View className="flex-row flex-wrap gap-3 pt-2 border-t border-border/30">
               {hasEvictions && (
                 <Badge variant="warning" size="sm" label={`${stats.wypowiedzenie} ${t.roomDetails.eviction}`} />
               )}
@@ -188,8 +188,8 @@ export default function DashboardScreen() {
   return (
     <ScreenContainer className="p-4">
       {/* Header */}
-      <View className="flex-row justify-between items-center mb-6">
-        <Text className="text-2xl font-bold text-foreground">{t.dashboard.title}</Text>
+      <View className="flex-row justify-between items-center mb-8">
+        <Text className="text-3xl font-bold text-foreground">{t.dashboard.title}</Text>
         <Pressable
           style={({ pressed }) => ({
             opacity: pressed ? 0.7 : 1,
@@ -202,12 +202,12 @@ export default function DashboardScreen() {
 
       {/* Dashboard Statistics - Compact Grid */}
       {!loading && projects.length > 0 && (
-        <View className="mb-4">
+        <View className="mb-6">
           {/* 2x3 Grid Layout */}
-          <View className="flex-row gap-2 mb-2">
+          <View className="flex-row gap-3 mb-3">
             {/* Occupancy */}
             <Pressable className="flex-1">
-              <Card className="p-3 bg-primary items-center">
+              <Card className="p-4 bg-primary items-center">
                 <Text className="text-white text-xs font-medium">Obłożenie</Text>
                 <Text className="text-white text-3xl font-bold mt-1">{overallStats.occupancyPercent}%</Text>
               </Card>
@@ -215,7 +215,7 @@ export default function DashboardScreen() {
 
             {/* Total Spaces */}
             <Pressable className="flex-1">
-              <Card className="p-3 items-center">
+              <Card className="p-4 items-center">
                 <MaterialIcons name="apartment" size={24} color={colors.primary} />
                 <Text className="text-xs text-muted mt-1">Razem</Text>
                 <Text className="text-xl font-bold text-foreground">{overallStats.totalSpaces}</Text>
@@ -224,7 +224,7 @@ export default function DashboardScreen() {
 
             {/* Occupied */}
             <Pressable className="flex-1">
-              <Card className="p-3 items-center">
+              <Card className="p-4 items-center">
                 <MaterialIcons name="person" size={24} color={colors.success} />
                 <Text className="text-xs text-muted mt-1">Zajęte</Text>
                 <Text className="text-xl font-bold text-foreground">{overallStats.totalOccupied}</Text>
@@ -232,10 +232,10 @@ export default function DashboardScreen() {
             </Pressable>
           </View>
 
-          <View className="flex-row gap-2">
+          <View className="flex-row gap-3">
             {/* Vacant */}
             <Pressable className="flex-1">
-              <Card className="p-3 items-center">
+              <Card className="p-4 items-center">
                 <MaterialIcons name="event-available" size={24} color={colors.warning} />
                 <Text className="text-xs text-muted mt-1">Wolne</Text>
                 <Text className="text-xl font-bold text-foreground">{overallStats.totalVacant}</Text>
@@ -244,7 +244,7 @@ export default function DashboardScreen() {
 
             {/* Wypowiedzenie */}
             <Pressable className="flex-1">
-              <Card className="p-3 items-center">
+              <Card className="p-4 items-center">
                 <MaterialIcons name="warning" size={24} color={colors.warning} />
                 <Text className="text-xs text-muted mt-1">Wyp.</Text>
                 <Text className="text-xl font-bold text-foreground">{overallStats.totalWypowiedzenie}</Text>
@@ -253,7 +253,7 @@ export default function DashboardScreen() {
 
             {/* Conflicts */}
             <Pressable className="flex-1">
-              <Card className="p-3 items-center">
+              <Card className="p-4 items-center">
                 <MaterialIcons name="error" size={24} color={colors.error} />
                 <Text className="text-xs text-muted mt-1">Konflikty</Text>
                 <Text className="text-xl font-bold text-foreground">{conflicts.length}</Text>
