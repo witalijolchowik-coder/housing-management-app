@@ -256,3 +256,15 @@
 - [x] Update getConflicts to detect unassigned tenants as conflicts
 - [x] Write comprehensive tests for settlement workflow (15 tests)
 - [x] All 106 tests passing
+
+
+### Exit Protection for Unassigned Tenants
+- [x] Add handleBackPress function to address-details.tsx
+- [x] Check for unassignedTenants before allowing exit
+- [x] Show Alert with tenant count and instructions
+- [x] Offer option to switch to "Pokoje" tab from alert
+- [x] Prevent exit until all tenants are assigned
+- [x] Unassigned tenants persist in storage if app closes
+- [x] Unassigned tenants appear in conflicts on dashboard
+- [x] Write comprehensive tests for exit protection (12 tests)
+- [x] All 118 tests passing

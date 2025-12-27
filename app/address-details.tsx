@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, FlatList, Pressable, Image, Modal } from 'react-native';
+import { ScrollView, Text, View, FlatList, Pressable, Image, Modal, Alert } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
@@ -255,11 +255,36 @@ export default function AddressDetailsScreen() {
   );
   const residents = [...address.unassignedTenants, ...assignedTenants];
 
+  const handleBackPress = () => {
+    // Check if there are unassigned tenants
+    if (address.unassignedTenants && address.unassignedTenants.length > 0) {
+      Alert.alert(
+        'Niezakończona operacja',
+        `Masz ${address.unassignedTenants.length} mieszkańca/ów bez przydzielonego miejsca. Przejdź do karty "Pokoje" i przydziel im pokoje, aby zakończyć operację.`,
+        [
+          {
+            text: 'Anuluj',
+            onPress: () => {},
+            style: 'cancel',
+          },
+          {
+            text: 'Przejdź do Pokojów',
+            onPress: () => {
+              setActiveTab('rooms');
+            },
+          },
+        ]
+      );
+    } else {
+      router.back();
+    }
+  };
+
   return (
     <ScreenContainer>
       {/* Header */}
       <View className="flex-row items-center gap-2 mb-4">
-        <Pressable onPress={() => router.back()} className="p-2">
+        <Pressable onPress={handleBackPress} className="p-2">
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </Pressable>
         <Text className="text-2xl font-bold text-foreground flex-1">{address.name}</Text>
