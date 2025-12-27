@@ -1,10 +1,11 @@
-import { View, Text, Pressable, Modal, ScrollView, TextInput } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useTranslations } from '@/hooks/use-translations';
 import { Tenant, EvictionFormData, EvictionReason, Address } from '@/types';
 import { Chip } from '@/components/ui/chip';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface EvictionFormModalProps {
   visible: boolean;
@@ -54,20 +55,46 @@ export function EvictionFormModal({
       return;
     }
 
-    try {
-      setLoading(true);
-      await onSave({ 
-        checkoutDate, 
-        reason,
-        targetAddressId: reason === 'relocation' ? selectedAddressId : undefined
-      });
-      onClose();
-    } catch (error) {
-      console.error('Error saving eviction:', error);
-      alert(t.messages.savingError);
-    } finally {
-      setLoading(false);
-    }
+    // Show confirmation dialog
+    const reasonLabel = reasons.find(r => r.value === reason)?.label || reason;
+    const targetAddress = reason === 'relocation' && selectedAddressId
+      ? availableAddresses.find(a => a.id === selectedAddressId)
+      : null;
+    
+    const confirmMessage = tenant
+      ? `Czy na pewno chcesz wymeldować ${tenant.firstName} ${tenant.lastName}?\n\nData wymeldowania: ${checkoutDate}\nPrzyczyna: ${reasonLabel}${targetAddress ? `\nNowy adres: ${targetAddress.name}` : ''}`
+      : `Czy na pewno chcesz wymeldować tego mieszkańca?\n\nData: ${checkoutDate}\nPrzyczyna: ${reasonLabel}`;
+
+    Alert.alert(
+      'Potwierdzenie wymeldowania',
+      confirmMessage,
+      [
+        {
+          text: 'Anuluj',
+          style: 'cancel',
+        },
+        {
+          text: 'Potwierdź',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await onSave({ 
+                checkoutDate, 
+                reason,
+                targetAddressId: reason === 'relocation' ? selectedAddressId : undefined
+              });
+              onClose();
+            } catch (error) {
+              console.error('Error saving eviction:', error);
+              alert(t.messages.savingError);
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const reasons: { value: EvictionReason; label: string }[] = [
@@ -119,20 +146,12 @@ export function EvictionFormModal({
 
           {/* Checkout Date */}
           <View className="mb-6">
-            <Text className="text-sm font-semibold text-foreground mb-2">
-              Data wymeldowania *
-            </Text>
-            <TextInput
+            <DatePicker
               value={checkoutDate}
-              onChangeText={setCheckoutDate}
-              placeholder="2025-01-15"
-              placeholderTextColor={colors.muted}
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              editable={!loading}
+              onChange={setCheckoutDate}
+              label="Data wymeldowania *"
+              placeholder="Wybierz datę"
             />
-            <Text className="text-xs text-muted mt-2">
-              Format: YYYY-MM-DD
-            </Text>
           </View>
 
           {/* Reason */}

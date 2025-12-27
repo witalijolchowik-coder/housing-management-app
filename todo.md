@@ -524,3 +524,5 @@
 - [x] Move operator tags to same line as city in project cards (not wrapping to second line)
 - [x] Make occupancy card (Obłożenie 50%) same size as other dashboard cards
 - [x] Fix eviction form - add radio buttons for selecting eviction reason
+- [x] Add date picker calendar to eviction form (replace text input)
+- [x] Add confirmation dialog before eviction (show summary and require confirmation)
