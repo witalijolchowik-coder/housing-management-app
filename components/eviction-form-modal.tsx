@@ -140,19 +140,32 @@ export function EvictionFormModal({
             <Text className="text-sm font-semibold text-foreground mb-3">
               Przyczyna wymeldowania *
             </Text>
-            <View className="gap-2">
+            <View className="gap-3">
               {reasons.map((r) => (
-                <Chip
+                <Pressable
                   key={r.value}
-                  label={r.label}
-                  selected={reason === r.value}
                   onPress={() => {
                     setReason(r.value);
                     if (r.value !== 'relocation') {
                       setSelectedAddressId(undefined);
                     }
                   }}
-                />
+                  className="flex-row items-center gap-3 bg-surface rounded-lg p-4 border border-border"
+                  style={({ pressed }) => ({
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  {/* Radio Button */}
+                  <View className="w-6 h-6 rounded-full border-2 items-center justify-center" style={{
+                    borderColor: reason === r.value ? colors.primary : colors.border,
+                  }}>
+                    {reason === r.value && (
+                      <View className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.primary }} />
+                    )}
+                  </View>
+                  {/* Label */}
+                  <Text className="flex-1 text-foreground">{r.label}</Text>
+                </Pressable>
               ))}
             </View>
           </View>

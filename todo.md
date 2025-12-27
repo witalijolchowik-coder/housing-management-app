@@ -523,3 +523,4 @@
 - [x] Verify conflict detection works correctly with updated status
 - [x] Move operator tags to same line as city in project cards (not wrapping to second line)
 - [x] Make occupancy card (Obłożenie 50%) same size as other dashboard cards
+- [x] Fix eviction form - add radio buttons for selecting eviction reason
