@@ -337,3 +337,19 @@
 - [x] Test UI layout and readability
 - [x] Verify visual hierarchy is correct
 - [x] All 124 tests passing
+
+
+### Space Deletion with Smart Alerts
+- [x] Add Delete Space option to space context menu (always visible)
+- [x] Menu has 2 options: Wypowiedzenie and Delete
+- [x] If space is empty: show alert Delete or put on eviction?
+  - Option 1: Delete → remove space, decrease space count
+  - Option 2: Put on eviction → set eviction status
+  - Option 3: Cancel
+- [x] If space is occupied: show alert Place is occupied. Free it and try again.
+  - Option 1: Put on eviction → set eviction status (keep tenant)
+  - Option 2: Cancel
+  - Cannot delete occupied space (no relocate option)
+- [x] Implement delete space function with occupancy checks
+- [x] Test all deletion scenarios
+- [x] All 124 tests passing

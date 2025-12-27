@@ -93,28 +93,74 @@ export default function RoomDetailsScreen() {
   };
 
   const handleDeleteSpace = async (space: Space) => {
-    try {
-      if (space.tenant) {
-        alert('Nie możesz usunąć zajęte miejsce');
-        return;
-      }
-      const projects = await loadData();
-      const project = projects.find((p) => p.id === projectId);
-      if (project) {
-        const addr = project.addresses.find((a) => a.id === addressId);
-        if (addr) {
-          const r = addr.rooms.find((rm) => rm.id === roomId);
-          if (r) {
-            r.spaces = r.spaces.filter((s) => s.id !== space.id);
-            await saveData(projects);
-            await loadRoom();
-            setSpaceMenuVisible(false);
-            setSelectedSpace(undefined);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting space:', error);
+    setSpaceMenuVisible(false);
+    
+    if (space.tenant) {
+      // Space is occupied - cannot delete without eviction
+      Alert.alert(
+        'Miejsce zajęte',
+        'Miejsce jest zajęte. Zwolnij to miejsce i spróbuj ponownie usunąć.',
+        [
+          {
+            text: 'Anuluj',
+            onPress: () => {},
+            style: 'cancel',
+          },
+          {
+            text: 'Postaw na wypowiedzenie',
+            onPress: () => {
+              if (selectedSpace) {
+                handleToggleWypowiedzenie(selectedSpace, true);
+              }
+            },
+          },
+        ]
+      );
+    } else {
+      // Space is empty - offer choice
+      Alert.alert(
+        'Usunąć miejsce',
+        'Czy chcesz usunąć to miejsce lub postawić je na wypowiedzenie?',
+        [
+          {
+            text: 'Anuluj',
+            onPress: () => {},
+            style: 'cancel',
+          },
+          {
+            text: 'Postaw na wypowiedzenie',
+            onPress: () => {
+              if (selectedSpace) {
+                handleToggleWypowiedzenie(selectedSpace, true);
+              }
+            },
+          },
+          {
+            text: 'Usuń',
+            onPress: async () => {
+              try {
+                const projects = await loadData();
+                const project = projects.find((p) => p.id === projectId);
+                if (project) {
+                  const addr = project.addresses.find((a) => a.id === addressId);
+                  if (addr) {
+                    const r = addr.rooms.find((rm) => rm.id === roomId);
+                    if (r) {
+                      r.spaces = r.spaces.filter((s) => s.id !== space.id);
+                      await saveData(projects);
+                      await loadRoom();
+                      setSelectedSpace(undefined);
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('Error deleting space:', error);
+              }
+            },
+            style: 'destructive',
+          },
+        ]
+      );
     }
   }
 
@@ -307,19 +353,17 @@ export default function RoomDetailsScreen() {
                   <Text className="text-foreground">{t.common.edit}</Text>
                 </Pressable>
 
-                {!selectedSpace.tenant && (
-                  <Pressable
-                    onPress={() => {
-                      if (selectedSpace) {
-                        handleDeleteSpace(selectedSpace);
-                      }
-                    }}
-                    className="p-3 flex-row items-center gap-2"
-                  >
-                    <MaterialIcons name="delete" size={20} color={colors.error} />
-                    <Text className="text-error">{t.common.delete}</Text>
-                  </Pressable>
-                )}
+                <Pressable
+                  onPress={() => {
+                    if (selectedSpace) {
+                      handleDeleteSpace(selectedSpace);
+                    }
+                  }}
+                  className="p-3 flex-row items-center gap-2"
+                >
+                  <MaterialIcons name="delete" size={20} color={colors.error} />
+                  <Text className="text-error">{t.common.delete}</Text>
+                </Pressable>
 
                 {selectedSpace.wypowiedzenie ? (
                   <Pressable
