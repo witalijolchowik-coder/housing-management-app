@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Project, Tenant } from '@/types';
-import { loadData } from '@/lib/store';
+import { loadData, loadEvictionArchive } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 
 interface TenantWithHistory extends Tenant {
@@ -16,6 +16,9 @@ interface TenantWithHistory extends Tenant {
   roomNumber: number | string;
   currentAddress: string;
   currentRoom: string;
+  isArchived?: boolean;
+  evictionDate?: string;
+  evictionReason?: string;
   history: Array<{
     projectName: string;
     addressName: string;
@@ -32,6 +35,7 @@ export default function SearchScreen() {
   const [searchResults, setSearchResults] = useState<TenantWithHistory[]>([]);
   const [selectedTenant, setSelectedTenant] = useState<TenantWithHistory | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searchInArchive, setSearchInArchive] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -133,6 +137,52 @@ export default function SearchScreen() {
         }
       }
 
+      // Search in archive if checkbox is enabled
+      if (searchInArchive) {
+        const archive = await loadEvictionArchive();
+        for (const entry of archive) {
+          const firstName = entry.firstName.toLowerCase();
+          const lastName = entry.lastName.toLowerCase();
+          const fullName = `${firstName} ${lastName}`;
+
+          if (
+            firstName.includes(query) ||
+            lastName.includes(query) ||
+            fullName.includes(query)
+          ) {
+            // Create tenant object from archive entry
+            const archivedTenant: TenantWithHistory = {
+              id: entry.tenantId,
+              firstName: entry.firstName,
+              lastName: entry.lastName,
+              gender: 'male', // Default, not stored in archive
+              birthYear: 0, // Not stored in archive
+              checkInDate: entry.checkInDate,
+              monthlyPrice: 0, // Not stored in archive
+              projectName: entry.projectName,
+              addressName: entry.addressName,
+              roomNumber: '-',
+              currentAddress: 'Archiwum',
+              currentRoom: '-',
+              isArchived: true,
+              evictionDate: entry.checkOutDate,
+              evictionReason: entry.reason,
+              history: [{
+                projectName: entry.projectName,
+                addressName: entry.addressName,
+                checkInDate: entry.checkInDate,
+                checkOutDate: entry.checkOutDate,
+              }],
+            };
+
+            // Avoid duplicates
+            if (!results.some((r) => r.id === archivedTenant.id && r.isArchived)) {
+              results.push(archivedTenant);
+            }
+          }
+        }
+      }
+
       setSearchResults(results);
     } catch (error) {
       console.error('Error searching:', error);
@@ -164,11 +214,20 @@ export default function SearchScreen() {
               </Text>
               <Text className="text-sm text-muted mt-1">{item.projectName}</Text>
             </View>
-            <Badge
-              variant={item.gender === 'male' ? 'info' : 'warning'}
-              size="sm"
-              label={item.gender === 'male' ? '♂' : '♀'}
-            />
+            <View className="flex-row gap-2">
+              {item.isArchived && (
+                <Badge
+                  variant="warning"
+                  size="sm"
+                  label="Archiwum"
+                />
+              )}
+              <Badge
+                variant={item.gender === 'male' ? 'info' : 'warning'}
+                size="sm"
+                label={item.gender === 'male' ? '♂' : '♀'}
+              />
+            </View>
           </View>
           <Text className="text-xs text-muted">Rok urodzenia: {item.birthYear}</Text>
           <Text className="text-xs text-muted">Zameldowany: {item.checkInDate}</Text>
@@ -197,9 +256,46 @@ export default function SearchScreen() {
             </View>
           </View>
 
+          {/* Archived Badge */}
+          {selectedTenant.isArchived && (
+            <Card className="p-4 mb-4 bg-warning/10 border-warning">
+              <View className="flex-row items-center gap-2 mb-3">
+                <MaterialIcons name="archive" size={20} color={colors.warning} />
+                <Text className="text-sm font-semibold" style={{ color: colors.warning }}>Archiwum</Text>
+              </View>
+              <View className="gap-2">
+                <View className="flex-row justify-between">
+                  <Text className="text-sm text-muted">Data wymeldowania</Text>
+                  <Text className="text-sm font-semibold text-foreground">{selectedTenant.evictionDate}</Text>
+                </View>
+                <View className="flex-row justify-between">
+                  <Text className="text-sm text-muted">Powód</Text>
+                  <Text className="text-sm font-semibold text-foreground">{selectedTenant.evictionReason}</Text>
+                </View>
+              </View>
+              
+              {/* Move to Project Button */}
+              <Pressable
+                onPress={() => Alert.alert(
+                  'Przeniesienie do projektu',
+                  'Funkcja przeniesienia mieszkańca z archiwum do nowego projektu zostanie wkrótce dodana.',
+                  [{ text: 'OK' }]
+                )}
+                className="mt-4 bg-primary rounded-lg py-3 items-center"
+                style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+              >
+                <View className="flex-row items-center gap-2">
+                  <MaterialIcons name="restore" size={20} color="white" />
+                  <Text className="text-sm font-semibold text-white">Przeń do projektu</Text>
+                </View>
+              </Pressable>
+            </Card>
+          )}
+
           {/* Basic Info */}
-          <Card className="p-4 mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-3">Dane osobowe</Text>
+          {!selectedTenant.isArchived && (
+            <Card className="p-4 mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-3">Dane osobowe</Text>
             <View className="gap-2">
               <View className="flex-row justify-between">
                 <Text className="text-sm text-muted">Płeć</Text>
@@ -213,8 +309,10 @@ export default function SearchScreen() {
               </View>
             </View>
           </Card>
+          )}
 
           {/* Current Residence */}
+          {!selectedTenant.isArchived && (
           <Card className="p-4 mb-4">
             <Text className="text-sm font-semibold text-foreground mb-3">Obecne zameldowanie</Text>
             <View className="gap-2">
@@ -240,6 +338,7 @@ export default function SearchScreen() {
               </View>
             </View>
           </Card>
+          )}
 
           {/* History */}
           {selectedTenant.history.length > 0 && (
@@ -272,20 +371,38 @@ export default function SearchScreen() {
       <Text className="text-2xl font-bold text-foreground mb-6">{t.search.title}</Text>
 
       {/* Search Bar */}
-      <View className="flex-row gap-2 mb-6">
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Imię lub nazwisko..."
-          placeholderTextColor={colors.muted}
-          className="flex-1 bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-        />
+      <View className="mb-6">
+        <View className="flex-row gap-2 mb-3">
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Imię lub nazwisko..."
+            placeholderTextColor={colors.muted}
+            className="flex-1 bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+          />
+          <Pressable
+            onPress={handleSearch}
+            disabled={loading}
+            className="bg-primary rounded-lg px-4 py-3 items-center justify-center"
+          >
+            <MaterialIcons name="search" size={24} color="white" />
+          </Pressable>
+        </View>
+        
+        {/* Archive Search Checkbox */}
         <Pressable
-          onPress={handleSearch}
-          disabled={loading}
-          className="bg-primary rounded-lg px-4 py-3 items-center justify-center"
+          onPress={() => setSearchInArchive(!searchInArchive)}
+          className="flex-row items-center gap-2"
+          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
         >
-          <MaterialIcons name="search" size={24} color="white" />
+          <View className={`w-5 h-5 rounded border-2 items-center justify-center ${
+            searchInArchive ? 'bg-primary border-primary' : 'border-border'
+          }`}>
+            {searchInArchive && (
+              <MaterialIcons name="check" size={16} color="white" />
+            )}
+          </View>
+          <Text className="text-sm text-foreground">Szukaj w archiwum</Text>
         </Pressable>
       </View>
 

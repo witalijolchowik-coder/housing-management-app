@@ -534,3 +534,7 @@
 - [x] Show alert with two options: increase address limit or cancel bed addition
 - [x] Add validation when deleting room - check if room has occupied tenants
 - [x] Show warning message if trying to delete room with tenants
+- [x] Add 'Search in archive' checkbox to search screen
+- [x] Implement archive search to find evicted tenants with history
+- [x] Add 'Move to project' button in archived tenant profile
+- [x] Implement dialog to select project/address for archived tenant restoration
