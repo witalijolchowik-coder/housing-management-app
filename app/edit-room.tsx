@@ -91,12 +91,54 @@ export default function EditRoomScreen() {
         .reduce((sum, r) => sum + r.totalSpaces, 0);
 
       if (otherRoomsSpaces + spacesCount > address.totalSpaces) {
+        const newTotal = otherRoomsSpaces + spacesCount;
         Alert.alert(
-          'Błąd',
-          `Nie można zmienić pokoju na ${spacesCount} miejsc, ponieważ całkowita liczba miejsc (${otherRoomsSpaces + spacesCount}) przekroczy limit adresu (${address.totalSpaces})`
+          'Przekroczono limit miejsc',
+          `Całkowita liczba miejsc (${newTotal}) przekroczy limit adresu (${address.totalSpaces}).\n\nCzy chcesz zwiększyć limit adresu do ${newTotal} miejsc?`,
+          [
+            {
+              text: 'Anuluj',
+              style: 'cancel',
+              onPress: () => {
+                setLoading(false);
+              },
+            },
+            {
+              text: 'Zwiększ limit',
+              onPress: async () => {
+                // Update address totalSpaces
+                address.totalSpaces = newTotal;
+                // Continue with room update
+                await continueRoomUpdate();
+              },
+            },
+          ]
         );
         return;
       }
+
+      await continueRoomUpdate();
+    } catch (error) {
+      console.error('Error editing room:', error);
+      Alert.alert('Błąd', 'Nie udało się edytować pokoju');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const continueRoomUpdate = async () => {
+    try {
+      const projects = await loadData();
+      const project = projects.find((p) => p.id === projectId);
+      if (!project) return;
+
+      const address = project.addresses.find((a) => a.id === addressId);
+      if (!address) return;
+
+      const roomToEdit = address.rooms.find((r) => r.id === roomId);
+      if (!roomToEdit) return;
+
+      const spacesCount = parseInt(totalSpaces);
 
       // Update room
       roomToEdit.name = roomName.trim();
@@ -150,10 +192,8 @@ export default function EditRoomScreen() {
       Alert.alert('Sukces', `Pokój "${roomName}" zaktualizowany pomyślnie`);
       router.back();
     } catch (error) {
-      console.error('Error editing room:', error);
-      Alert.alert('Błąd', 'Nie udało się edytować pokoju');
-    } finally {
-      setLoading(false);
+      console.error('Error updating room:', error);
+      Alert.alert('Błąd', 'Nie udało się zaktualizować pokoju');
     }
   };
 
