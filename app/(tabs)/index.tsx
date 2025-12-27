@@ -123,8 +123,25 @@ export default function DashboardScreen() {
   };
 
   const handleStatClick = (type: string) => {
-    // Statistics cards are clickable for future detailed views
-    console.log('Stat clicked:', type);
+    switch (type) {
+      case 'wypowiedzenie':
+        router.push('/statistics-detail-evictions');
+        break;
+      case 'conflicts':
+        router.push('/statistics-detail-conflicts');
+        break;
+      case 'vacant':
+        router.push('/statistics-detail-vacant');
+        break;
+      case 'occupied':
+        router.push('/statistics-detail-occupied');
+        break;
+      case 'total':
+        router.push('/statistics-detail-total');
+        break;
+      default:
+        break;
+    }
   };
 
   const overallStats = calculateOverallStats();
@@ -206,7 +223,11 @@ export default function DashboardScreen() {
           {/* 2x3 Grid Layout */}
           <View className="flex-row gap-3 mb-3">
             {/* Occupancy */}
-            <Pressable className="flex-1">
+            <Pressable 
+              onPress={() => handleStatClick('occupancy')}
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+              className="flex-1"
+            >
               <Card className="p-4 bg-primary items-center">
                 <Text className="text-white text-xs font-medium">Obłożenie</Text>
                 <Text className="text-white text-3xl font-bold mt-1">{overallStats.occupancyPercent}%</Text>
@@ -214,7 +235,11 @@ export default function DashboardScreen() {
             </Pressable>
 
             {/* Total Spaces */}
-            <Pressable className="flex-1">
+            <Pressable 
+              onPress={() => handleStatClick('total')}
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+              className="flex-1"
+            >
               <Card className="p-4 items-center">
                 <MaterialIcons name="apartment" size={24} color={colors.primary} />
                 <Text className="text-xs text-muted mt-1">Razem</Text>
@@ -223,7 +248,11 @@ export default function DashboardScreen() {
             </Pressable>
 
             {/* Occupied */}
-            <Pressable className="flex-1">
+            <Pressable 
+              onPress={() => handleStatClick('occupied')}
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+              className="flex-1"
+            >
               <Card className="p-4 items-center">
                 <MaterialIcons name="person" size={24} color={colors.success} />
                 <Text className="text-xs text-muted mt-1">Zajęte</Text>
@@ -234,7 +263,11 @@ export default function DashboardScreen() {
 
           <View className="flex-row gap-3">
             {/* Vacant */}
-            <Pressable className="flex-1">
+            <Pressable 
+              onPress={() => handleStatClick('vacant')}
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+              className="flex-1"
+            >
               <Card className="p-4 items-center">
                 <MaterialIcons name="event-available" size={24} color={colors.warning} />
                 <Text className="text-xs text-muted mt-1">Wolne</Text>
@@ -243,7 +276,11 @@ export default function DashboardScreen() {
             </Pressable>
 
             {/* Wypowiedzenie */}
-            <Pressable className="flex-1">
+            <Pressable 
+              onPress={() => handleStatClick('wypowiedzenie')}
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+              className="flex-1"
+            >
               <Card className="p-4 items-center">
                 <MaterialIcons name="warning" size={24} color={colors.warning} />
                 <Text className="text-xs text-muted mt-1">Wyp.</Text>
@@ -252,7 +289,11 @@ export default function DashboardScreen() {
             </Pressable>
 
             {/* Conflicts */}
-            <Pressable className="flex-1">
+            <Pressable 
+              onPress={() => handleStatClick('conflicts')}
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+              className="flex-1"
+            >
               <Card className="p-4 items-center">
                 <MaterialIcons name="error" size={24} color={colors.error} />
                 <Text className="text-xs text-muted mt-1">Konflikty</Text>

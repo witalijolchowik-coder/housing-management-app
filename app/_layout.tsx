@@ -106,6 +106,11 @@ export default function RootLayout() {
               <Stack.Screen name="room-details" />
               <Stack.Screen name="add-tenant" />
               <Stack.Screen name="add-address" />
+              <Stack.Screen name="statistics-detail-evictions" />
+              <Stack.Screen name="statistics-detail-conflicts" />
+              <Stack.Screen name="statistics-detail-vacant" />
+              <Stack.Screen name="statistics-detail-occupied" />
+              <Stack.Screen name="statistics-detail-total" />
             </Stack>
           </NavigationContext.Provider>
           <StatusBar style="auto" />

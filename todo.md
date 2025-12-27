@@ -203,3 +203,13 @@
 - [x] Enhance project cards (larger text, better dividers)
 - [x] Improve address cards (larger photos, better padding)
 - [x] All 42 tests passing, no functionality broken
+
+
+### Dashboard Detail Screens (Clickable Cards)
+- [x] Make dashboard cards clickable (Obłożenie, Razem, Zajęte, Wolne, Wyp., Konflikty)
+- [x] Create evictions detail screen (Project → Address → Room → Tenant with dates/reasons)
+- [x] Create conflicts detail screen (Project → Address → Room → Tenant with conflict details)
+- [x] Create vacant spaces detail screen (by Project → Address with counts)
+- [x] Create occupied spaces detail screen (by Project → Address with counts)
+- [x] Add back navigation and visual hierarchy to detail screens
+- [x] Test all drill-down flows end-to-end (13 tests passing, 55 total tests)
