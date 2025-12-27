@@ -5,6 +5,7 @@ import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProgressBar } from '@/components/ui/progress-bar';
+import { OccupancyProgress } from '@/components/ui/occupancy-progress';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Address, Room, Tenant } from '@/types';
@@ -226,11 +227,7 @@ export default function AddressDetailsScreen() {
               </View>
 
               <View className="gap-2">
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-xs text-muted">{t.addressList.occupied}</Text>
-                  <Text className="text-sm font-semibold text-occupied">{stats.occupied}</Text>
-                </View>
-                <ProgressBar progress={(stats.occupied / stats.total) * 100} color="bg-occupied" />
+                <OccupancyProgress occupied={stats.occupied} total={stats.total} size="md" />
               </View>
 
               {stats.wypowiedzenie > 0 && (

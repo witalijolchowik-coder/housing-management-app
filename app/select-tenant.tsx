@@ -5,7 +5,7 @@ import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Address, Tenant } from '@/types';
+import { Address, Tenant, Room } from '@/types';
 import { loadData, saveData } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -20,6 +20,7 @@ export default function SelectTenantScreen() {
   const router = useRouter();
   const { projectId, addressId, roomId } = useLocalSearchParams();
   const [address, setAddress] = useState<Address | null>(null);
+  const [room, setRoom] = useState<Room | null>(null);
   const [sections, setSections] = useState<TenantSection[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,16 +37,34 @@ export default function SelectTenantScreen() {
         if (addr) {
           setAddress(addr);
           
+          // Find the room to get its type for filtering
+          const foundRoom = addr.rooms.find((r) => r.id === roomId);
+          if (foundRoom) {
+            setRoom(foundRoom);
+          }
+          
+          // Filter tenants based on room type
+          const filterTenantByRoomType = (tenant: Tenant, roomType: string): boolean => {
+            if (roomType === 'couple') return true; // Couple rooms accept all genders
+            if (roomType === 'male') return tenant.gender === 'male';
+            if (roomType === 'female') return tenant.gender === 'female';
+            return true;
+          };
+
+          const roomType = foundRoom?.type || 'couple';
+          
           // Organize tenants into sections
           // Section 1: Unassigned tenants (from unassignedTenants array)
-          const withoutRoomList = addr.unassignedTenants.map((t) => ({ ...t }));
+          const withoutRoomList = addr.unassignedTenants
+            .filter((t) => filterTenantByRoomType(t, roomType))
+            .map((t) => ({ ...t }));
 
           // Section 2: Already assigned tenants (from rooms)
           const withRoomList: (Tenant & { currentRoom?: string })[] = [];
-          for (const room of addr.rooms) {
-            for (const space of room.spaces) {
-              if (space.tenant) {
-                withRoomList.push({ ...space.tenant, currentRoom: room.name });
+          for (const r of addr.rooms) {
+            for (const space of r.spaces) {
+              if (space.tenant && filterTenantByRoomType(space.tenant, roomType)) {
+                withRoomList.push({ ...space.tenant, currentRoom: r.name });
               }
             }
           }

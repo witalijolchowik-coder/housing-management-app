@@ -302,3 +302,15 @@
 - [x] Display eviction dates if applicable
 - [x] Fix navigation from tenant list to details
 - [x] All 124 tests passing
+
+
+### Gender-Based Filtering & Progress Bars
+- [x] Add gender filtering to select-tenant screen based on room type
+- [x] Filter logic: male room → only male tenants, female room → only female tenants, couple room → all
+- [x] Add occupancy progress bar component
+- [x] Display progress bars on room cards showing occupied/total spaces
+- [x] Color coding: green (has space), yellow (mostly full), red (full)
+- [x] Show occupancy ratio (e.g., 2/4) on progress bar
+- [x] Test filtering with different room types
+- [x] Test progress bar calculations
+- [x] All 124 tests passing
