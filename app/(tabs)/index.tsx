@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, FlatList, Pressable } from 'react-native';
+import { ScrollView, Text, View, FlatList, Pressable, Alert } from 'react-native';
 import { useEffect, useState } from 'react';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
@@ -9,8 +9,8 @@ import { ProjectMenuModal } from '@/components/project-menu-modal';
 import { ProjectFormModal } from '@/components/project-form-modal';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Project, ProjectStats } from '@/types';
-import { loadData, calculateProjectStats, initializeDemoData, addProject, updateProject, deleteProject } from '@/lib/store';
+import { Project, ProjectStats, Conflict } from '@/types';
+import { loadData, calculateProjectStats, initializeDemoData, addProject, updateProject, deleteProject, getConflicts } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
@@ -25,6 +25,7 @@ export default function DashboardScreen() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [formVisible, setFormVisible] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | undefined>();
+  const [conflicts, setConflicts] = useState<Conflict[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -41,11 +42,45 @@ export default function DashboardScreen() {
         data = await loadData();
       }
       setProjects(data);
+      
+      // Collect all conflicts
+      const allConflicts: Conflict[] = [];
+      for (const project of data) {
+        allConflicts.push(...getConflicts(project));
+      }
+      setConflicts(allConflicts);
     } catch (error) {
       console.error('Error loading projects:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const calculateOverallStats = () => {
+    let totalSpaces = 0;
+    let totalOccupied = 0;
+    let totalVacant = 0;
+    let totalWypowiedzenie = 0;
+    let totalCost = 0;
+
+    for (const project of projects) {
+      const stats = calculateProjectStats(project);
+      totalSpaces += stats.total;
+      totalOccupied += stats.occupied;
+      totalVacant += stats.vacant;
+      totalWypowiedzenie += stats.wypowiedzenie;
+      
+      // Calculate total cost
+      for (const address of project.addresses) {
+        totalCost += address.totalCost || 0;
+      }
+    }
+
+    const occupancyPercent = totalSpaces > 0 
+      ? Math.round(((totalOccupied + totalWypowiedzenie) / totalSpaces) * 100)
+      : 0;
+
+    return { totalSpaces, totalOccupied, totalVacant, totalWypowiedzenie, occupancyPercent, totalCost };
   };
 
   const handleProjectPress = (projectId: string) => {
@@ -92,6 +127,13 @@ export default function DashboardScreen() {
       throw error;
     }
   };
+
+  const handleStatClick = (type: string) => {
+    // Statistics cards are clickable for future detailed views
+    console.log('Stat clicked:', type);
+  };
+
+  const overallStats = calculateOverallStats();
 
   const renderProjectCard = ({ item }: { item: Project }) => {
     const stats = calculateProjectStats(item);
@@ -164,6 +206,92 @@ export default function DashboardScreen() {
         </Pressable>
       </View>
 
+      {/* Dashboard Statistics */}
+      {!loading && projects.length > 0 && (
+        <View className="gap-3 mb-6">
+          {/* Occupancy - Large card */}
+          <Pressable>
+            <Card className="p-6 bg-primary items-center">
+              <Text className="text-white text-sm font-medium">Obłożenie</Text>
+              <Text className="text-white text-5xl font-bold mt-2">{overallStats.occupancyPercent}%</Text>
+              <Text className="text-white/80 text-sm mt-2">Cel: 100%</Text>
+            </Card>
+          </Pressable>
+
+          {/* Stats Grid */}
+          <View className="gap-3">
+            {/* Total Spaces */}
+            <Pressable>
+              <Card className="p-4 flex-row justify-between items-center">
+                <View>
+                  <Text className="text-sm text-muted">Razem miejsc</Text>
+                  <Text className="text-2xl font-bold text-foreground mt-1">{overallStats.totalSpaces}</Text>
+                </View>
+                <MaterialIcons name="apartment" size={32} color={colors.primary} />
+              </Card>
+            </Pressable>
+
+            {/* Occupied Spaces */}
+            <Pressable>
+              <Card className="p-4 flex-row justify-between items-center">
+                <View>
+                  <Text className="text-sm text-muted">Zajęte miejsca</Text>
+                  <Text className="text-2xl font-bold text-foreground mt-1">{overallStats.totalOccupied}</Text>
+                </View>
+                <MaterialIcons name="person" size={32} color={colors.success} />
+              </Card>
+            </Pressable>
+
+            {/* Vacant Spaces */}
+            <Pressable>
+              <Card className="p-4 flex-row justify-between items-center">
+                <View>
+                  <Text className="text-sm text-muted">Wolne miejsca</Text>
+                  <Text className="text-2xl font-bold text-foreground mt-1">{overallStats.totalVacant}</Text>
+                </View>
+                <MaterialIcons name="event-available" size={32} color={colors.warning} />
+              </Card>
+            </Pressable>
+
+            {/* Wypowiedzenie */}
+            <Pressable>
+              <Card className="p-4 flex-row justify-between items-center">
+                <View>
+                  <Text className="text-sm text-muted">Na wypowiedzeniu</Text>
+                  <Text className="text-2xl font-bold text-foreground mt-1">{overallStats.totalWypowiedzenie}</Text>
+                </View>
+                <MaterialIcons name="warning" size={32} color={colors.warning} />
+              </Card>
+            </Pressable>
+
+            {/* Conflicts */}
+            <Pressable>
+              <Card className="p-4 flex-row justify-between items-center">
+                <View>
+                  <Text className="text-sm text-muted">Konflikty</Text>
+                  <Text className="text-2xl font-bold text-foreground mt-1">{conflicts.length}</Text>
+                </View>
+                <MaterialIcons name="error" size={32} color={colors.error} />
+              </Card>
+            </Pressable>
+
+            {/* Total Cost */}
+            <Card className="p-4 flex-row justify-between items-center">
+              <View>
+                <Text className="text-sm text-muted">Całkowity koszt</Text>
+                <Text className="text-2xl font-bold text-foreground mt-1">
+                  {overallStats.totalCost.toLocaleString('pl-PL')} PLN
+                </Text>
+              </View>
+              <MaterialIcons name="attach-money" size={32} color={colors.primary} />
+            </Card>
+          </View>
+
+          {/* Divider */}
+          <View className="h-px bg-border my-2" />
+        </View>
+      )}
+
       {/* Projects List */}
       {loading ? (
         <View className="flex-1 items-center justify-center">
@@ -174,13 +302,13 @@ export default function DashboardScreen() {
           <Text className="text-muted">{t.messages.emptyProject}</Text>
         </View>
       ) : (
-        <FlatList
-          data={projects}
-          renderItem={renderProjectCard}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          contentContainerStyle={{ paddingBottom: 80 }}
-        />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+          {projects.map((project) => (
+            <View key={project.id}>
+              {renderProjectCard({ item: project })}
+            </View>
+          ))}
+        </ScrollView>
       )}
 
       {/* FAB */}

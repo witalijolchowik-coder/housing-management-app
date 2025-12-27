@@ -183,3 +183,11 @@
 - [x] Apply Material Design 3 styling to calendar
 - [x] Fix random stretching of bottom dates on scroll
 - [x] Improve overall calendar appearance and spacing
+
+
+### Dashboard & Reports Restructuring
+- [x] Create dashboard statistics component with cards
+- [x] Move all statistics from Reports tab to Projects tab (top)
+- [x] Simplify Reports tab to show only project reports with download buttons
+- [x] Dashboard shows: Obłożenie, Razem miejsc, Zajęte, Wolne, Na wypowiedzeniu, Konflikty, Całkowity koszt
+- [x] Reports tab shows: Project name, occupancy %, progress bar, stats, download button
