@@ -384,3 +384,16 @@
 - [x] Installed expo-document-picker and expo-sharing packages
 - [x] Created 12 comprehensive tests for export/import functionality
 - [x] All 136 tests passing
+
+
+### Project Card Operator Tags
+- [x] Add operator tags below city name in project cards
+- [x] Show which operators provide housing in each project (Rent Planet, E-Port, Other)
+- [x] Design transparent tags with border and building icon (variant 3 approved)
+- [x] Handle single operator (most common) and multiple operators
+- [x] Collect unique operators from all addresses in project
+- [x] Generate visual mockup for design approval
+- [x] Implement operator tags in dashboard project cards with building icon
+- [x] Updated demo data with operators for all projects
+- [x] Created 12 comprehensive tests for operator tags
+- [x] All 148 tests passing

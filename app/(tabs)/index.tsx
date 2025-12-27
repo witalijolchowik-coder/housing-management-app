@@ -153,6 +153,28 @@ export default function DashboardScreen() {
     const hasEvictions = stats.wypowiedzenie > 0;
     const hasConflicts = stats.conflictCount > 0;
 
+    // Collect unique operators from all addresses
+    const operators = new Set<string>();
+    item.addresses.forEach(address => {
+      if (address.operator) {
+        operators.add(address.operator);
+      }
+    });
+    const operatorList = Array.from(operators);
+
+    const getOperatorLabel = (operator: string) => {
+      switch (operator) {
+        case 'rent_planet':
+          return 'Rent Planet';
+        case 'e_port':
+          return 'E-Port';
+        case 'other':
+          return 'Inne';
+        default:
+          return operator;
+      }
+    };
+
     return (
       <Pressable
         onPress={() => handleProjectPress(item.id)}
@@ -168,6 +190,19 @@ export default function DashboardScreen() {
                 <Text className="text-xl font-bold text-foreground">{item.name}</Text>
                 {item.city && (
                   <Text className="text-sm text-muted mt-1">{item.city}</Text>
+                )}
+                {operatorList.length > 0 && (
+                  <View className="flex-row flex-wrap gap-2 mt-2">
+                    {operatorList.map((operator) => (
+                      <View
+                        key={operator}
+                        className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/50"
+                      >
+                        <MaterialIcons name="business" size={12} color={colors.muted} />
+                        <Text className="text-xs text-muted">{getOperatorLabel(operator)}</Text>
+                      </View>
+                    ))}
+                  </View>
                 )}
               </View>
               <Pressable
