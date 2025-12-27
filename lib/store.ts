@@ -252,18 +252,87 @@ export const deleteProject = async (projectId: string): Promise<void> => {
 };
 
 // CRUD operations for Addresses
-export const addAddress = async (projectId: string, addressData: Omit<Address, 'id' | 'projectId' | 'rooms' | 'status'>): Promise<Address> => {
+export const addAddress = async (projectId: string, addressData: Omit<Address, 'id' | 'projectId' | 'rooms' | 'status'> & { regularRooms?: number }): Promise<Address> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
 
+  const { regularRooms = 0, ...restAddressData } = addressData;
+  const rooms: Room[] = [];
+
+  // Auto-generate regular (empty) rooms
+  for (let i = 0; i < regularRooms; i++) {
+    const roomId = generateId();
+    rooms.push({
+      id: roomId,
+      addressId: '', // Will be set below
+      name: `Pokój ${i + 1}`,
+      type: 'male', // Default to male, can be changed later
+      totalSpaces: 0, // Empty room
+      spaces: [],
+      amenities: {
+        shower: false,
+        toilet: false,
+        wifi: false,
+        stove: false,
+        fridge: false,
+      },
+    });
+  }
+
+  // Auto-generate couple rooms (2 beds each)
+  for (let i = 0; i < addressData.coupleRooms; i++) {
+    const roomId = generateId();
+    const spaces: Space[] = [];
+    
+    // Create 2 spaces for couple room
+    for (let j = 0; j < 2; j++) {
+      spaces.push({
+        id: generateId(),
+        roomId,
+        number: j + 1,
+        status: 'vacant',
+        tenant: null,
+        amenities: {
+          shower: false,
+          toilet: false,
+          wifi: false,
+          stove: false,
+          fridge: false,
+        },
+      });
+    }
+
+    rooms.push({
+      id: roomId,
+      addressId: '', // Will be set below
+      name: `Pokój dla par ${i + 1}`,
+      type: 'couple',
+      totalSpaces: 2,
+      spaces,
+      amenities: {
+        shower: false,
+        toilet: false,
+        wifi: false,
+        stove: false,
+        fridge: false,
+      },
+    });
+  }
+
   const newAddress: Address = {
-    ...addressData,
+    ...restAddressData,
     id: generateId(),
     projectId,
-    rooms: [],
+    rooms,
     status: 'active',
   };
+
+  // Set addressId for all rooms
+  newAddress.rooms.forEach(room => {
+    room.addressId = newAddress.id;
+  });
+
   projects[projectIndex].addresses.push(newAddress);
   await saveData(projects);
   return newAddress;

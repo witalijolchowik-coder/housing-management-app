@@ -24,6 +24,7 @@ export function AddressFormModal({
     name: '',
     fullAddress: '',
     totalSpaces: 0,
+    regularRooms: 0,
     coupleRooms: 0,
     companyName: '',
     ownerName: '',
@@ -43,6 +44,7 @@ export function AddressFormModal({
         name: address.name,
         fullAddress: address.fullAddress,
         totalSpaces: address.totalSpaces,
+        regularRooms: 0, // Not editable for existing addresses
         coupleRooms: address.coupleRooms,
         companyName: address.companyName,
         ownerName: address.ownerName,
@@ -59,6 +61,7 @@ export function AddressFormModal({
         name: '',
         fullAddress: '',
         totalSpaces: 0,
+        regularRooms: 0,
         coupleRooms: 0,
         companyName: '',
         ownerName: '',
@@ -228,7 +231,7 @@ export function AddressFormModal({
           {/* Total Spaces */}
           <View className="mb-4">
             <Text className="text-sm font-semibold text-foreground mb-2">
-              {t.forms.totalSpaces}
+              Razem miejsc
             </Text>
             <TextInput
               value={formData.totalSpaces.toString()}
@@ -241,10 +244,31 @@ export function AddressFormModal({
             />
           </View>
 
+          {/* Regular Rooms */}
+          {!address && (
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-2">
+                Zwykłe pokoje
+              </Text>
+              <TextInput
+                value={formData.regularRooms.toString()}
+                onChangeText={(text) => setFormData({ ...formData, regularRooms: parseInt(text) || 0 })}
+                placeholder="5"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                editable={!loading}
+              />
+              <Text className="text-xs text-muted mt-1">
+                Liczba pustych pokoi do utworzenia
+              </Text>
+            </View>
+          )}
+
           {/* Couple Rooms */}
           <View className="mb-4">
             <Text className="text-sm font-semibold text-foreground mb-2">
-              {t.forms.coupleRooms}
+              Pokoje dla par
             </Text>
             <TextInput
               value={formData.coupleRooms.toString()}
@@ -255,6 +279,11 @@ export function AddressFormModal({
               className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
               editable={!loading}
             />
+            {!address && (
+              <Text className="text-xs text-muted mt-1">
+                Pokoje z 2 miejscami dla par
+              </Text>
+            )}
           </View>
 
           {/* Owner Name */}

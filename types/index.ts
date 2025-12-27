@@ -153,6 +153,7 @@ export interface AddAddressFormData {
   name: string;
   fullAddress: string;
   totalSpaces: number;
+  regularRooms: number; // Number of regular (empty) rooms to create
   coupleRooms: number;
   companyName: string;
   ownerName: string;

@@ -528,3 +528,5 @@
 - [x] Add confirmation dialog before eviction (show summary and require confirmation)
 - [x] Fix FAB button position on address list - raise above navigation bar
 - [x] Replace empty image placeholder with styled house icon in address cards
+- [x] Add 'Regular rooms' field to address form (between total beds and couple rooms)
+- [x] Auto-generate rooms when creating address: empty rooms for regular count, 2-bed rooms for couple count
