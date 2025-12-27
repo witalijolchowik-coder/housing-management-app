@@ -227,7 +227,15 @@ export default function RoomDetailsScreen() {
                   <Text className="text-lg font-bold text-foreground flex-1">
                     {item.tenant ? (
                       <>
-                        {item.tenant.firstName} {item.tenant.lastName} <Text className="text-muted">({item.tenant.birthYear})</Text>
+                        {item.tenant.firstName} {item.tenant.lastName}<Text className="text-muted">, {new Date().getFullYear() - item.tenant.birthYear} {(() => {
+                          const age = new Date().getFullYear() - item.tenant.birthYear;
+                          const lastDigit = age % 10;
+                          const lastTwoDigits = age % 100;
+                          if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'lat';
+                          if (lastDigit === 1) return 'rok';
+                          if (lastDigit >= 2 && lastDigit <= 4) return 'lata';
+                          return 'lat';
+                        })()}</Text>
                       </>
                     ) : 'Wolne'}
                   </Text>

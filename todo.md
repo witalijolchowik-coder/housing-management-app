@@ -508,3 +508,10 @@
 - [x] Add birth year (muted color) in search results
 - [x] Format: "Name Surname (1990)" with year in gray
 - [x] Helps distinguish tenants with same names and match roommates by age
+
+
+### Show Age Instead of Birth Year in Room Details
+- [x] Change room-details tenant display from birth year to age
+- [x] Format: "Name Surname, 34 года" (comma + age in muted color)
+- [x] Calculate age from birth year (current year - birth year)
+- [x] More intuitive for comparing roommate ages
