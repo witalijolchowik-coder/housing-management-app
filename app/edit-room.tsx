@@ -1,5 +1,5 @@
 import { ScrollView, Text, View, Pressable, TextInput, Alert } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
@@ -9,24 +9,42 @@ import { Room, RoomType } from '@/types';
 import { MaterialIcons } from '@expo/vector-icons';
 import { loadData, saveData } from '@/lib/store';
 
-const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
-
-export default function AddRoomScreen() {
+export default function EditRoomScreen() {
   const t = useTranslations();
   const colors = useColors();
   const router = useRouter();
-  const { projectId, addressId } = useLocalSearchParams();
+  const { projectId, addressId, roomId } = useLocalSearchParams();
 
   const [roomName, setRoomName] = useState('');
   const [roomType, setRoomType] = useState<RoomType>('male');
   const [totalSpaces, setTotalSpaces] = useState('');
   const [loading, setLoading] = useState(false);
+  const [room, setRoom] = useState<Room | null>(null);
+
+  useEffect(() => {
+    const loadRoom = async () => {
+      try {
+        const projects = await loadData();
+        const project = projects.find((p) => p.id === projectId);
+        if (!project) return;
+
+        const address = project.addresses.find((a) => a.id === addressId);
+        if (!address) return;
+
+        const foundRoom = address.rooms.find((r) => r.id === roomId);
+        if (foundRoom) {
+          setRoom(foundRoom);
+          setRoomName(foundRoom.name);
+          setRoomType(foundRoom.type);
+          setTotalSpaces(foundRoom.totalSpaces.toString());
+        }
+      } catch (error) {
+        console.error('Error loading room:', error);
+      }
+    };
+
+    loadRoom();
+  }, [projectId, addressId, roomId]);
 
   const handleSubmit = async () => {
     if (!roomName.trim()) {
@@ -49,7 +67,7 @@ export default function AddRoomScreen() {
       setLoading(true);
       const projects = await loadData();
       const project = projects.find((p) => p.id === projectId);
-      
+
       if (!project) {
         Alert.alert('Błąd', 'Projekt nie znaleziony');
         return;
@@ -61,43 +79,91 @@ export default function AddRoomScreen() {
         return;
       }
 
-      // Validate total spaces
-      const currentTotalSpaces = address.rooms.reduce((sum, room) => sum + room.totalSpaces, 0);
-      if (currentTotalSpaces + spacesCount > address.totalSpaces) {
+      const roomToEdit = address.rooms.find((r) => r.id === roomId);
+      if (!roomToEdit) {
+        Alert.alert('Błąd', 'Pokój nie znaleziony');
+        return;
+      }
+
+      // Validate total spaces (excluding current room)
+      const otherRoomsSpaces = address.rooms
+        .filter((r) => r.id !== roomId)
+        .reduce((sum, r) => sum + r.totalSpaces, 0);
+
+      if (otherRoomsSpaces + spacesCount > address.totalSpaces) {
         Alert.alert(
           'Błąd',
-          `Nie można dodać pokoju z ${spacesCount} miejscami, ponieważ całkowita liczba miejsc (${currentTotalSpaces + spacesCount}) przekroczy limit adresu (${address.totalSpaces})`
+          `Nie można zmienić pokoju na ${spacesCount} miejsc, ponieważ całkowita liczba miejsc (${otherRoomsSpaces + spacesCount}) przekroczy limit adresu (${address.totalSpaces})`
         );
         return;
       }
 
-      // Create new room
-      const newRoom: Room = {
-        id: generateUUID(),
-        addressId: addressId as string,
-        name: roomName.trim(),
-        type: roomType,
-        totalSpaces: spacesCount,
-        spaces: Array.from({ length: spacesCount }, (_, i) => ({
-          id: generateUUID(),
-          roomId: generateUUID(),
-          number: i + 1,
-          status: 'vacant' as const,
-        })),
-      };
+      // Update room
+      roomToEdit.name = roomName.trim();
+      roomToEdit.type = roomType;
 
-      address.rooms.push(newRoom);
+      // If space count changed, update spaces array
+      if (spacesCount !== roomToEdit.totalSpaces) {
+        const oldSpacesCount = roomToEdit.totalSpaces;
+        roomToEdit.totalSpaces = spacesCount;
+
+        if (spacesCount > oldSpacesCount) {
+          // Add new spaces
+          const generateUUID = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              const r = (Math.random() * 16) | 0;
+              const v = c === 'x' ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+            });
+          };
+
+          for (let i = oldSpacesCount; i < spacesCount; i++) {
+            roomToEdit.spaces.push({
+              id: generateUUID(),
+              roomId: roomToEdit.id,
+              number: i + 1,
+              status: 'vacant',
+            });
+          }
+        } else {
+          // Remove spaces (only vacant ones from the end)
+          const spacesToRemove = oldSpacesCount - spacesCount;
+          let removed = 0;
+          for (let i = roomToEdit.spaces.length - 1; i >= 0 && removed < spacesToRemove; i--) {
+            if (roomToEdit.spaces[i].status === 'vacant' && !roomToEdit.spaces[i].tenant) {
+              roomToEdit.spaces.splice(i, 1);
+              removed++;
+            }
+          }
+
+          if (removed < spacesToRemove) {
+            Alert.alert(
+              'Ostrzeżenie',
+              `Nie można zmniejszyć liczby miejsc, ponieważ ${spacesToRemove - removed} miejsc jest zajęte`
+            );
+            return;
+          }
+        }
+      }
+
       await saveData(projects);
-
-      Alert.alert('Sukces', `Pokój "${roomName}" dodany pomyślnie`);
+      Alert.alert('Sukces', `Pokój "${roomName}" zaktualizowany pomyślnie`);
       router.back();
     } catch (error) {
-      console.error('Error adding room:', error);
-      Alert.alert('Błąd', 'Nie udało się dodać pokoju');
+      console.error('Error editing room:', error);
+      Alert.alert('Błąd', 'Nie udało się edytować pokoju');
     } finally {
       setLoading(false);
     }
   };
+
+  if (!room) {
+    return (
+      <ScreenContainer className="p-4 pt-12 pb-20 items-center justify-center">
+        <Text className="text-foreground">{t.common.loading}</Text>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer className="p-4 pt-12 pb-20">
@@ -110,7 +176,7 @@ export default function AddRoomScreen() {
           >
             <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
           </Pressable>
-          <Text className="text-2xl font-bold text-foreground flex-1">Dodaj pokój</Text>
+          <Text className="text-2xl font-bold text-foreground flex-1">Edytuj pokój</Text>
         </View>
 
         {/* Form */}
@@ -180,7 +246,7 @@ export default function AddRoomScreen() {
           {/* Info Box */}
           <View className="bg-surface rounded-lg p-3 border border-primary/30">
             <Text className="text-xs text-muted">
-              💡 Po utworzeniu pokoju będziesz mógł dodawać do niego miejsca (łóżka).
+              💡 Zmiana liczby miejsc może wpłynąć na istniejące rezerwacje.
             </Text>
           </View>
 
@@ -194,7 +260,7 @@ export default function AddRoomScreen() {
             className="bg-primary rounded-lg px-6 py-4 items-center mt-4"
           >
             <Text className="text-background font-semibold text-base">
-              {loading ? 'Ładowanie...' : 'Dodaj pokój'}
+              {loading ? 'Ładowanie...' : 'Zapisz zmiany'}
             </Text>
           </Pressable>
         </Card>

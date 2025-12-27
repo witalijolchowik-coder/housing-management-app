@@ -278,3 +278,15 @@
 - [x] Delete tenant directly from alert
 - [x] Write tests for alert actions (6 tests)
 - [x] All 124 tests passing
+
+
+### Room Management Improvements
+- [x] Update room gender labels: "Mieści" (male), "Żeńskie" (female), "Pary" (couples)
+- [x] Increase gender icon size in room cards
+- [x] Fix room edit form - now opens edit-room instead of add-address
+- [x] Add totalSpaces field to Room type (already existed)
+- [x] Implement space count validation in add-room and edit-room forms
+- [x] Show validation alert when total spaces exceed address limit
+- [x] Update room form to include space count field
+- [x] Create edit-room.tsx screen for editing rooms
+- [x] All 124 tests passing

@@ -204,7 +204,7 @@ export default function AddressDetailsScreen() {
                   </Text>
                   <Badge
                     variant="info"
-                    size="sm"
+                    size="lg"
                     label={roomTypeLabel[item.type]}
                     className="mt-2"
                   />
@@ -448,7 +448,7 @@ export default function AddressDetailsScreen() {
               onPress={() => {
                 if (selectedRoom) {
                   router.push({
-                    pathname: '/add-address',
+                    pathname: '/edit-room',
                     params: { projectId, addressId, roomId: selectedRoom.id },
                   });
                 }
