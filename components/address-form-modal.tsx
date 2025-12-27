@@ -148,6 +148,83 @@ export function AddressFormModal({
             />
           </View>
 
+          {/* Operator */}
+          <View className="mb-4">
+            <Text className="text-sm font-semibold text-foreground mb-3">
+              Dostawca *
+            </Text>
+            <View className="gap-2">
+              {/* Rent Planet */}
+              <Pressable
+                onPress={() => setFormData({ ...formData, operator: 'rent_planet' })}
+                className={`flex-row items-center p-3 rounded-lg border ${
+                  formData.operator === 'rent_planet'
+                    ? 'bg-primary/20 border-primary'
+                    : 'bg-surface border-border'
+                }`}
+              >
+                <View
+                  className={`w-5 h-5 rounded-full border-2 mr-3 ${
+                    formData.operator === 'rent_planet'
+                      ? 'bg-primary border-primary'
+                      : 'border-muted'
+                  }`}
+                />
+                <Text className="text-foreground font-medium">Rent Planet</Text>
+              </Pressable>
+
+              {/* E-Port */}
+              <Pressable
+                onPress={() => setFormData({ ...formData, operator: 'e_port' })}
+                className={`flex-row items-center p-3 rounded-lg border ${
+                  formData.operator === 'e_port'
+                    ? 'bg-primary/20 border-primary'
+                    : 'bg-surface border-border'
+                }`}
+              >
+                <View
+                  className={`w-5 h-5 rounded-full border-2 mr-3 ${
+                    formData.operator === 'e_port'
+                      ? 'bg-primary border-primary'
+                      : 'border-muted'
+                  }`}
+                />
+                <Text className="text-foreground font-medium">E-Port</Text>
+              </Pressable>
+
+              {/* Other Operator */}
+              <Pressable
+                onPress={() => setFormData({ ...formData, operator: 'other' })}
+                className={`flex-row items-center p-3 rounded-lg border ${
+                  formData.operator === 'other'
+                    ? 'bg-primary/20 border-primary'
+                    : 'bg-surface border-border'
+                }`}
+              >
+                <View
+                  className={`w-5 h-5 rounded-full border-2 mr-3 ${
+                    formData.operator === 'other'
+                      ? 'bg-primary border-primary'
+                      : 'border-muted'
+                  }`}
+                />
+                <Text className="text-foreground font-medium">Inny dostawca</Text>
+              </Pressable>
+
+              {/* Custom Operator Name */}
+              {formData.operator === 'other' && (
+                <TextInput
+                  value={formData.operatorName || ''}
+                  onChangeText={(text) => setFormData({ ...formData, operatorName: text })}
+                  placeholder="Nazwa dostawcy"
+                  placeholderTextColor={colors.muted}
+                  className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground mt-2"
+                  editable={!loading}
+                />
+              )}
+            </View>
+          </View>
+
           {/* Total Spaces */}
           <View className="mb-4">
             <Text className="text-sm font-semibold text-foreground mb-2">
@@ -175,21 +252,6 @@ export function AddressFormModal({
               placeholder="2"
               placeholderTextColor={colors.muted}
               keyboardType="number-pad"
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              editable={!loading}
-            />
-          </View>
-
-          {/* Company Name */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">
-              {t.forms.companyName}
-            </Text>
-            <TextInput
-              value={formData.companyName}
-              onChangeText={(text) => setFormData({ ...formData, companyName: text })}
-              placeholder={t.forms.companyName}
-              placeholderTextColor={colors.muted}
               className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
               editable={!loading}
             />
@@ -272,83 +334,6 @@ export function AddressFormModal({
               className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
               editable={!loading}
             />
-          </View>
-
-          {/* Operator */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-3">
-              Operator firmy *
-            </Text>
-            <View className="gap-2">
-              {/* Rent Planet */}
-              <Pressable
-                onPress={() => setFormData({ ...formData, operator: 'rent_planet' })}
-                className={`flex-row items-center p-3 rounded-lg border ${
-                  formData.operator === 'rent_planet'
-                    ? 'bg-primary/20 border-primary'
-                    : 'bg-surface border-border'
-                }`}
-              >
-                <View
-                  className={`w-5 h-5 rounded-full border-2 mr-3 ${
-                    formData.operator === 'rent_planet'
-                      ? 'bg-primary border-primary'
-                      : 'border-muted'
-                  }`}
-                />
-                <Text className="text-foreground font-medium">Rent Planet</Text>
-              </Pressable>
-
-              {/* E-Port */}
-              <Pressable
-                onPress={() => setFormData({ ...formData, operator: 'e_port' })}
-                className={`flex-row items-center p-3 rounded-lg border ${
-                  formData.operator === 'e_port'
-                    ? 'bg-primary/20 border-primary'
-                    : 'bg-surface border-border'
-                }`}
-              >
-                <View
-                  className={`w-5 h-5 rounded-full border-2 mr-3 ${
-                    formData.operator === 'e_port'
-                      ? 'bg-primary border-primary'
-                      : 'border-muted'
-                  }`}
-                />
-                <Text className="text-foreground font-medium">E-Port</Text>
-              </Pressable>
-
-              {/* Other Operator */}
-              <Pressable
-                onPress={() => setFormData({ ...formData, operator: 'other' })}
-                className={`flex-row items-center p-3 rounded-lg border ${
-                  formData.operator === 'other'
-                    ? 'bg-primary/20 border-primary'
-                    : 'bg-surface border-border'
-                }`}
-              >
-                <View
-                  className={`w-5 h-5 rounded-full border-2 mr-3 ${
-                    formData.operator === 'other'
-                      ? 'bg-primary border-primary'
-                      : 'border-muted'
-                  }`}
-                />
-                <Text className="text-foreground font-medium">Inny operator</Text>
-              </Pressable>
-
-              {/* Custom Operator Name */}
-              {formData.operator === 'other' && (
-                <TextInput
-                  value={formData.operatorName || ''}
-                  onChangeText={(text) => setFormData({ ...formData, operatorName: text })}
-                  placeholder="Nazwa operatora"
-                  placeholderTextColor={colors.muted}
-                  className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground mt-2"
-                  editable={!loading}
-                />
-              )}
-            </View>
           </View>
 
           {/* Couple Price */}

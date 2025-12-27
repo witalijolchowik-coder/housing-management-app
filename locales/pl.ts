@@ -66,9 +66,9 @@ export const pl = {
   roomDetails: {
     title: 'Pokój',
     type: 'Typ',
-    male: 'Mieści',
-    female: 'Żeńskie',
-    couple: 'Pary',
+    male: 'mężczyzny',
+    female: 'kobiety',
+    couple: 'para',
     spaces: 'Miejsca',
     vacant: 'Wolne',
     occupied: 'Zajęte',

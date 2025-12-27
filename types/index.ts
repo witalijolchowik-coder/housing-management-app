@@ -3,7 +3,7 @@
 export type Gender = 'male' | 'female';
 export type RoomType = 'male' | 'female' | 'couple';
 export type SpaceStatus = 'vacant' | 'occupied' | 'wypowiedzenie';
-export type EvictionReason = 'job_change' | 'own_housing' | 'disciplinary';
+export type EvictionReason = 'job_change' | 'own_housing' | 'disciplinary' | 'relocation';
 
 export interface Tenant {
   id: string;
@@ -103,6 +103,7 @@ export interface Project {
   name: string;
   city?: string;
   addresses: Address[];
+  evictionArchive?: EvictionArchive[];
 }
 
 // Computed statistics

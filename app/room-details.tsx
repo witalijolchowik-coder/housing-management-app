@@ -291,15 +291,10 @@ export default function RoomDetailsScreen() {
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </Pressable>
         <View className="flex-1">
-          <View className="flex-row items-center gap-2 mb-1">
-            <Text className="text-2xl font-bold text-foreground">{t.roomDetails.title} {room.name}</Text>
-            <View className="px-3 py-1.5 bg-primary rounded-full">
-              <Text className="text-lg text-background font-bold">
-                {room.type === 'male' ? '♂' : room.type === 'female' ? '♀' : '♡'}
-              </Text>
-            </View>
+          <View className="gap-1 mb-1">
+            <Text className="text-2xl font-bold text-foreground">{room.name}</Text>
+            <Text className="text-sm text-muted">{roomTypeLabel[room.type]}</Text>
           </View>
-          <Text className="text-sm text-muted">{roomTypeLabel[room.type]}</Text>
         </View>
       </View>
 

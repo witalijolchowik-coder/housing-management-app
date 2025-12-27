@@ -8,9 +8,10 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { OccupancyProgress } from '@/components/ui/occupancy-progress';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Address, Room, Tenant } from '@/types';
+import { Address, Room, Tenant, Project, EvictionFormData } from '@/types';
 import { loadData, calculateRoomStats, getDaysRemaining, saveData } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
+import { EvictionFormModal } from '@/components/eviction-form-modal';
 
 export default function AddressDetailsScreen() {
   const t = useTranslations();
@@ -24,6 +25,8 @@ export default function AddressDetailsScreen() {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | undefined>(undefined);
   const [roomMenuVisible, setRoomMenuVisible] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | undefined>(undefined);
+  const [evictionModalVisible, setEvictionModalVisible] = useState(false);
+  const [project, setProject] = useState<Project | null>(null);
 
   useEffect(() => {
     loadAddress();
@@ -39,9 +42,10 @@ export default function AddressDetailsScreen() {
   const loadAddress = async () => {
     try {
       const projects = await loadData();
-      const project = projects.find((p) => p.id === projectId);
-      if (project) {
-        const addr = project.addresses.find((a) => a.id === addressId);
+      const proj = projects.find((p) => p.id === projectId);
+      if (proj) {
+        setProject(proj);
+        const addr = proj.addresses.find((a) => a.id === addressId);
         if (addr) {
           setAddress(addr);
         }
@@ -187,9 +191,9 @@ export default function AddressDetailsScreen() {
       : 0;
 
     const roomTypeLabel = {
-      male: `♂ ${t.roomDetails.male}`,
-      female: `♀ ${t.roomDetails.female}`,
-      couple: `♡ ${t.roomDetails.couple}`,
+      male: t.roomDetails.male,
+      female: t.roomDetails.female,
+      couple: t.roomDetails.couple,
     };
 
     return (
@@ -204,47 +208,41 @@ export default function AddressDetailsScreen() {
           })}
           className="flex-1"
         >
-          <Card className="p-4 mb-3">
-            <View className="gap-3">
-              <View className="flex-row justify-between items-start">
+          <Card className="p-3 mb-3">
+            <View className="gap-2">
+              {/* Header row with room name and menu */}
+              <View className="flex-row justify-between items-center">
                 <View className="flex-1">
-                  <Text className="text-lg font-bold text-foreground">
-                    {t.roomDetails.title} {item.name}
+                  <Text className="text-lg font-bold text-foreground mb-0.5">
+                    {item.name}
                   </Text>
-                  <Badge
-                    variant="info"
-                    size="lg"
-                    label={roomTypeLabel[item.type]}
-                    className="mt-2"
-                  />
-                </View>
-                <View className="flex-row gap-2 items-center">
-                  <Text className="text-sm text-muted">
-                    {stats.occupied}/{stats.total}
+                  <Text className="text-xs text-muted">
+                    {roomTypeLabel[item.type]}
                   </Text>
-                  <Pressable
-                    onPress={() => {
-                      setSelectedRoom(item);
-                      setRoomMenuVisible(true);
-                    }}
-                    className="p-2"
-                  >
-                    <MaterialIcons name="more-vert" size={20} color={colors.foreground} />
-                  </Pressable>
                 </View>
+                <Pressable
+                  onPress={() => {
+                    setSelectedRoom(item);
+                    setRoomMenuVisible(true);
+                  }}
+                  className="p-2 -mr-2"
+                >
+                  <MaterialIcons name="more-vert" size={20} color={colors.foreground} />
+                </Pressable>
               </View>
 
-              <View className="gap-2">
-                <OccupancyProgress occupied={stats.occupied} total={stats.total} size="md" />
+              {/* Occupancy progress */}
+              <View className="pt-1">
+                <OccupancyProgress occupied={stats.occupied} total={stats.total} size="sm" />
               </View>
 
+              {/* Eviction warning (if any) */}
               {stats.wypowiedzenie > 0 && (
-                <View className="gap-2">
-                  <View className="flex-row justify-between items-center">
-                    <Text className="text-xs text-muted">{t.roomDetails.eviction}</Text>
-                    <Text className="text-sm font-semibold text-warning">{stats.wypowiedzenie}</Text>
-                  </View>
-                  <ProgressBar progress={(stats.wypowiedzenie / stats.total) * 100} color="bg-warning" />
+                <View className="flex-row items-center gap-2 pt-1">
+                  <MaterialIcons name="warning" size={14} color={colors.warning} />
+                  <Text className="text-xs text-warning">
+                    {t.roomDetails.eviction}: {stats.wypowiedzenie}
+                  </Text>
                 </View>
               )}
             </View>
@@ -409,30 +407,15 @@ export default function AddressDetailsScreen() {
             </Pressable>
             <Pressable
               onPress={() => {
-                if (selectedTenant) {
-                  router.push({
-                    pathname: '/room-details',
-                    params: { projectId, addressId, roomId: selectedTenant.spaceId, action: 'evict' },
-                  });
-                }
                 setTenantMenuVisible(false);
+                setEvictionModalVisible(true);
               }}
               className="p-3 flex-row items-center gap-2"
             >
               <MaterialIcons name="logout" size={20} color={colors.error} />
               <Text className="text-error">{t.common.evict}</Text>
             </Pressable>
-            <Pressable
-              onPress={() => {
-                if (selectedTenant) {
-                  handleDeleteTenant(selectedTenant);
-                }
-              }}
-              className="p-3 flex-row items-center gap-2"
-            >
-              <MaterialIcons name="delete" size={20} color={colors.error} />
-              <Text className="text-error">{t.common.delete}</Text>
-            </Pressable>
+
           </Card>
         </Pressable>
       </Modal>
@@ -478,6 +461,103 @@ export default function AddressDetailsScreen() {
           </Card>
         </Pressable>
       </Modal>
+
+      {/* Eviction Form Modal */}
+      <EvictionFormModal
+        visible={evictionModalVisible}
+        tenant={selectedTenant}
+        projectAddresses={project?.addresses || []}
+        currentAddressId={addressId as string}
+        onClose={() => {
+          setEvictionModalVisible(false);
+          setSelectedTenant(undefined);
+        }}
+        onSave={async (data) => {
+          if (!selectedTenant || !address) return;
+          
+          try {
+            const projects = await loadData();
+            const proj = projects.find((p) => p.id === projectId);
+            if (!proj) return;
+            
+            const addr = proj.addresses.find((a) => a.id === addressId);
+            if (!addr) return;
+            
+            // Handle relocation to another address
+            if (data.reason === 'relocation' && data.targetAddressId) {
+              const targetAddr = proj.addresses.find((a) => a.id === data.targetAddressId);
+              if (targetAddr) {
+                // Remove tenant from current address
+                addr.unassignedTenants = addr.unassignedTenants.filter(t => t.id !== selectedTenant.id);
+                if (selectedTenant.spaceId) {
+                  for (const room of addr.rooms) {
+                    const space = room.spaces.find(s => s.id === selectedTenant.spaceId);
+                    if (space) {
+                      space.tenant = null;
+                      space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
+                    }
+                  }
+                }
+                
+                // Add tenant to target address unassignedTenants
+                const relocatedTenant = { ...selectedTenant };
+                delete relocatedTenant.spaceId; // Remove space assignment
+                targetAddr.unassignedTenants.push(relocatedTenant);
+                
+                await saveData(projects);
+                await loadAddress();
+                setEvictionModalVisible(false);
+                setSelectedTenant(undefined);
+                alert(`Жилец переселен на адрес: ${targetAddr.name}`);
+                return;
+              }
+            }
+            
+            // Handle regular eviction (move to archive)
+            // Remove from unassignedTenants if present
+            addr.unassignedTenants = addr.unassignedTenants.filter(t => t.id !== selectedTenant.id);
+            
+            // Remove from rooms if assigned
+            if (selectedTenant.spaceId) {
+              for (const room of addr.rooms) {
+                const space = room.spaces.find(s => s.id === selectedTenant.spaceId);
+                if (space) {
+                  space.tenant = null;
+                  space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
+                }
+              }
+            }
+            
+            // Add to eviction archive
+            if (!proj.evictionArchive) {
+              proj.evictionArchive = [];
+            }
+            proj.evictionArchive.push({
+              id: `eviction-${Date.now()}`,
+              tenantId: selectedTenant.id,
+              firstName: selectedTenant.firstName,
+              lastName: selectedTenant.lastName,
+              projectId: proj.id,
+              projectName: proj.name,
+              addressId: addr.id,
+              addressName: addr.name,
+              checkInDate: selectedTenant.checkInDate,
+              checkOutDate: data.checkoutDate,
+              reason: data.reason,
+              createdAt: new Date().toISOString(),
+            });
+            
+            await saveData(projects);
+            await loadAddress();
+            setEvictionModalVisible(false);
+            setSelectedTenant(undefined);
+            alert('Жилец успешно выселен');
+          } catch (error) {
+            console.error('Error evicting tenant:', error);
+            alert('Ошибка при выселении');
+          }
+        }}
+      />
     </ScreenContainer>
   );
 }

@@ -422,3 +422,67 @@
 - [ ] Test: Add tenant → should appear immediately in list
 - [ ] Test: Assign tenant to space → statistics should update immediately (1/7, ~14%)
 - [ ] Test: Dashboard should show correct occupied/free counts
+
+
+### 🔴 CRITICAL: Tenant Not Removed from unassignedTenants
+- [x] After assigning tenant to space, tenant remains in unassignedTenants array
+- [x] Tenant shows "Bez miejsca" status even after assignment
+- [x] Statistics show both occupied space AND conflict simultaneously
+- [x] Conflict detector shows tenant as "bez miejsca" even after assignment
+- [x] Fix: Remove tenant from unassignedTenants in select-tenant.tsx after assignment (line 128-130)
+- [x] All 148 tests passing
+
+
+### Eviction Menu Redesign & Relocation Feature
+- [x] Remove "Удалить" (Delete) option from tenant menu (duplicate of Evict)
+- [x] Keep only "Редактировать" (Edit) and "Выселить" (Evict) in tenant menu
+- [x] Update eviction form with date picker (default: today)
+- [x] Add 4 eviction reasons:
+  - Переселился на свое жилье (Moved to own housing)
+  - Сменил работу (Changed job)
+  - Дисциплинарно (Disciplinary)
+  - Переселение на другой адрес (Relocation to another address)
+- [x] Implement address selection when "Переселение на другой адрес" is chosen
+- [x] Show list of other addresses in the same project
+- [x] If only one address in project, show message "На проекте нет больше адресов"
+- [x] Transfer tenant to new address unassignedTenants array
+- [x] Remove tenant from old address
+- [x] Regular eviction moves tenant to evictionArchive
+- [x] Relocation keeps tenant in project but moves to different address
+- [x] All 148 tests passing
+
+
+### Gender Terminology Unification & Room Card Redesign
+- [ ] Unify gender terminology across entire app:
+  - For people (tenants): **mężczyzna**, **kobieta** (singular)
+  - For rooms: **mężczyzny**, **kobiety**, **para** (plural/room types)
+- [ ] Fix "Mieści" to proper room type labels (mężczyzny/kobiety/para)
+- [ ] Remove gender icon (♂/♀) badge from room details header
+- [ ] Redesign room card for better aesthetics:
+  - More compact and modern design
+  - Better spacing and layout
+  - Show room type as text label instead of icon
+  - Improve visual hierarchy
+- [ ] Update translations for gender terms
+- [ ] Test all screens with updated terminology
+
+
+### Gender Terminology & Room Card Redesign
+- [x] Unify gender terminology across entire app
+- [x] Use "mężczyzna"/"kobieta" for individual people (singular)
+- [x] Use "mężczyzny"/"kobiety"/"para" for room types (plural)
+- [x] Remove incorrect terms like "Mieści"
+- [x] Remove blue circular gender icon from room-details.tsx header
+- [x] Redesign room cards for modern, compact, aesthetic appearance
+- [x] Display room type as text instead of badge with icon
+- [x] Improve room card visual hierarchy and spacing
+- [x] All 148 tests passing after changes
+
+
+### Add Address Form Updates
+- [x] Rename "Operator firmy" to "Dostawca" in translations
+- [x] Move "Dostawca" field to 3rd position (after name and address)
+- [x] Rename "Inny operator" to "Inny dostawca"
+- [x] Remove "Nazwa firmy" field completely from form
+- [x] Update all references to operator terminology
+- [x] Test form layout and functionality

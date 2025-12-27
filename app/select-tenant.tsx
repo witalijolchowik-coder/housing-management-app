@@ -123,6 +123,12 @@ export default function SelectTenantScreen() {
             if (availableSpace) {
               availableSpace.tenant = tenant;
               availableSpace.status = 'occupied';
+              
+              // Remove tenant from unassignedTenants array
+              if (addr.unassignedTenants) {
+                addr.unassignedTenants = addr.unassignedTenants.filter(t => t.id !== tenant.id);
+              }
+              
               await saveData(projects);
               router.back();
             }
