@@ -174,3 +174,12 @@
 - [x] Allow deletion of auto-created rooms (with safety check)
 - [x] Allow adding new rooms via FAB button
 - [x] Write tests for room auto-generation (10 tests passing)
+
+
+### Calendar Screen Improvements
+- [x] Fix bottom row (28-31) sizing - should match other rows
+- [x] Add third event type to legend (Wymeldowanie/Checkout)
+- [x] Move project filters from top to bottom
+- [x] Apply Material Design 3 styling to calendar
+- [x] Fix random stretching of bottom dates on scroll
+- [x] Improve overall calendar appearance and spacing

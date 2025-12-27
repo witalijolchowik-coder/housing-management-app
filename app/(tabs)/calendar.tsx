@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Project } from '@/types';
-import { loadData } from '@/lib/store';
+import { loadData, loadEvictionArchive } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 
 interface CalendarEvent {
@@ -24,6 +24,7 @@ export default function CalendarScreen() {
   const t = useTranslations();
   const colors = useColors();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [evictionArchive, setEvictionArchive] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -40,7 +41,9 @@ export default function CalendarScreen() {
     try {
       setLoading(true);
       const data = await loadData();
+      const archive = await loadEvictionArchive();
       setProjects(data);
+      setEvictionArchive(archive);
       if (data.length > 0) {
         setSelectedProjects([data[0].id]);
       }
@@ -89,8 +92,21 @@ export default function CalendarScreen() {
       }
     }
     
+    // Add check-out events from eviction archive
+    for (const archiveEntry of evictionArchive) {
+      events.push({
+        id: `checkout-${archiveEntry.id}`,
+        date: archiveEntry.checkOutDate,
+        type: 'check_out',
+        projectName: archiveEntry.projectName,
+        addressName: archiveEntry.addressName,
+        tenantName: `${archiveEntry.firstName} ${archiveEntry.lastName}`,
+        roomNumber: '',
+      });
+    }
+    
     return events;
-  }, [projects]);
+  }, [projects, evictionArchive]);
 
   // Filter events by selected projects
   const filteredEvents = useMemo(() => {
@@ -99,7 +115,7 @@ export default function CalendarScreen() {
       const project = projects.find((p) => p.name === event.projectName);
       return project && selectedProjects.includes(project.id);
     });
-  }, [allEvents, selectedProjects, projects]);
+  }, [allEvents, selectedProjects, projects, evictionArchive]);
 
   // Get events for current month
   const getDaysInMonth = (date: Date) => {
@@ -140,6 +156,7 @@ export default function CalendarScreen() {
         className={`flex-1 aspect-square rounded-lg items-center justify-center border ${
           hasEvents ? 'border-primary bg-surface' : 'border-border'
         }`}
+        style={{ minHeight: 60 }}
       >
         <Text className="text-sm font-semibold text-foreground">{day}</Text>
         {hasEvents && (
@@ -164,7 +181,7 @@ export default function CalendarScreen() {
 
     // Empty cells for days before month starts
     for (let i = 0; i < firstDayOfMonth; i++) {
-      days.push(<View key={`empty-${i}`} className="flex-1" />);
+      days.push(<View key={`empty-${i}`} className="flex-1" style={{ minHeight: 60 }} />);
     }
 
     // Days of month
@@ -182,7 +199,7 @@ export default function CalendarScreen() {
           >
             <MaterialIcons name="chevron-left" size={24} color={colors.foreground} />
           </Pressable>
-          <Text className="text-lg font-bold text-foreground">
+          <Text className="text-lg font-bold text-foreground capitalize">
             {currentDate.toLocaleString('pl-PL', { month: 'long', year: 'numeric' })}
           </Text>
           <Pressable
@@ -206,7 +223,11 @@ export default function CalendarScreen() {
         <View className="gap-1">
           {Array.from({ length: Math.ceil(days.length / 7) }).map((_, weekIndex) => (
             <View key={weekIndex.toString()} className="flex-row gap-1">
-              {days.slice(weekIndex * 7, (weekIndex + 1) * 7)}
+              {days.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => (
+                <View key={dayIndex} className="flex-1">
+                  {day}
+                </View>
+              ))}
             </View>
           ))}
         </View>
@@ -218,63 +239,13 @@ export default function CalendarScreen() {
 
   return (
     <ScreenContainer className="p-4">
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
-        <Text className="text-2xl font-bold text-foreground mb-6">{t.calendar.title}</Text>
-
-        {/* Project Filter */}
-        <Text className="text-sm font-semibold text-foreground mb-2">Filtry projektów</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mb-6"
-          contentContainerStyle={{ gap: 8 }}
-        >
-          <Pressable
-            onPress={() => {
-              if (selectedProjects.length === projects.length) {
-                setSelectedProjects([]);
-              } else {
-                setSelectedProjects(projects.map((p) => p.id));
-              }
-            }}
-            className={`px-4 py-2 rounded-full ${
-              selectedProjects.length === projects.length ? 'bg-primary' : 'bg-surface border border-border'
-            }`}
-          >
-            <Text className={`text-sm font-semibold ${
-              selectedProjects.length === projects.length ? 'text-white' : 'text-foreground'
-            }`}>
-              Wszystkie
-            </Text>
-          </Pressable>
-
-          {projects.map((project) => (
-            <Pressable
-              key={project.id}
-              onPress={() => {
-                setSelectedProjects((prev) =>
-                  prev.includes(project.id)
-                    ? prev.filter((id) => id !== project.id)
-                    : [...prev, project.id]
-                );
-              }}
-              className={`px-4 py-2 rounded-full ${
-                selectedProjects.includes(project.id) ? 'bg-primary' : 'bg-surface border border-border'
-              }`}
-            >
-              <Text className={`text-sm font-semibold ${
-                selectedProjects.includes(project.id) ? 'text-white' : 'text-foreground'
-              }`}>
-                {project.name}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <Text className="text-2xl font-bold text-foreground mb-6">Kalendarz</Text>
 
         {/* Calendar */}
         {loading ? (
-          <Text className="text-muted text-center py-8">{t.common.loading}</Text>
+          <Text className="text-muted text-center py-8">Ładowanie...</Text>
         ) : (
           <Card className="p-4 mb-6">
             {renderCalendar()}
@@ -282,16 +253,81 @@ export default function CalendarScreen() {
         )}
 
         {/* Legend */}
-        <View className="gap-2 mb-6">
+        <View className="gap-3 mb-6 bg-surface rounded-lg p-4">
           <Text className="text-sm font-semibold text-foreground">Legenda</Text>
-          <View className="flex-row items-center gap-2">
-            <View className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.success }} />
-            <Text className="text-sm text-foreground">Zameldowanie</Text>
+          <View className="gap-2">
+            <View className="flex-row items-center gap-3">
+              <View className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.success }} />
+              <Text className="text-sm text-foreground">Zamelowanie</Text>
+            </View>
+            <View className="flex-row items-center gap-3">
+              <View className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.error }} />
+              <Text className="text-sm text-foreground">Wymeldowanie</Text>
+            </View>
+            <View className="flex-row items-center gap-3">
+              <View className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.warning }} />
+              <Text className="text-sm text-foreground">Koniec wypowiedzenia</Text>
+            </View>
           </View>
-          <View className="flex-row items-center gap-2">
-            <View className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.warning }} />
-            <Text className="text-sm text-foreground">Koniec wypowiedzenia</Text>
-          </View>
+        </View>
+
+        {/* Project Filter - Moved to bottom */}
+        <View className="mb-4">
+          <Text className="text-sm font-semibold text-foreground mb-3">Filtry projektów</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+          >
+            <Pressable
+              onPress={() => {
+                if (selectedProjects.length === projects.length) {
+                  setSelectedProjects([]);
+                } else {
+                  setSelectedProjects(projects.map((p) => p.id));
+                }
+              }}
+              className={`px-4 py-2 rounded-full border ${
+                selectedProjects.length === projects.length 
+                  ? 'bg-primary border-primary' 
+                  : 'bg-surface border-border'
+              }`}
+            >
+              <Text className={`text-sm font-semibold ${
+                selectedProjects.length === projects.length 
+                  ? 'text-background' 
+                  : 'text-foreground'
+              }`}>
+                Wszystkie
+              </Text>
+            </Pressable>
+
+            {projects.map((project) => (
+              <Pressable
+                key={project.id}
+                onPress={() => {
+                  setSelectedProjects((prev) =>
+                    prev.includes(project.id)
+                      ? prev.filter((id) => id !== project.id)
+                      : [...prev, project.id]
+                  );
+                }}
+                className={`px-4 py-2 rounded-full border ${
+                  selectedProjects.includes(project.id) 
+                    ? 'bg-primary border-primary' 
+                    : 'bg-surface border-border'
+                }`}
+              >
+                <Text className={`text-sm font-semibold ${
+                  selectedProjects.includes(project.id) 
+                    ? 'text-background' 
+                    : 'text-foreground'
+                }`}>
+                  {project.name}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
       </ScrollView>
 
@@ -327,18 +363,26 @@ export default function CalendarScreen() {
                       <Text className="text-xs text-muted mt-1">{item.addressName}</Text>
                     </View>
                     <Badge
-                      variant={item.type === 'check_in' ? 'success' : 'warning'}
+                      variant={
+                        item.type === 'check_in' 
+                          ? 'success' 
+                          : item.type === 'check_out'
+                          ? 'error'
+                          : 'warning'
+                      }
                       size="sm"
                       label={
                         item.type === 'check_in'
-                          ? 'Zameldowanie'
+                          ? 'Zamelowanie'
                           : item.type === 'check_out'
                           ? 'Wymeldowanie'
                           : 'Koniec wypowiedzenia'
                       }
                     />
                   </View>
-                  <Text className="text-sm text-foreground">Miejsce: {item.roomNumber}</Text>
+                  {item.roomNumber && (
+                    <Text className="text-sm text-foreground">Miejsce: {item.roomNumber}</Text>
+                  )}
                 </View>
               </Card>
             )}
