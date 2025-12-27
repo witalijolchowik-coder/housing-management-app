@@ -223,11 +223,7 @@ export default function CalendarScreen() {
         <View className="gap-1">
           {Array.from({ length: Math.ceil(days.length / 7) }).map((_, weekIndex) => (
             <View key={weekIndex.toString()} className="flex-row gap-1">
-              {days.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => (
-                <View key={dayIndex} className="flex-1">
-                  {day}
-                </View>
-              ))}
+              {days.slice(weekIndex * 7, (weekIndex + 1) * 7)}
             </View>
           ))}
         </View>
