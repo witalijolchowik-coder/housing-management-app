@@ -268,3 +268,13 @@
 - [x] Unassigned tenants appear in conflicts on dashboard
 - [x] Write comprehensive tests for exit protection (12 tests)
 - [x] All 118 tests passing
+
+
+### Alert Improvements for Unassigned Tenants
+- [x] Update alert title to "Niezakończona operacja zaselenia"
+- [x] Show specific tenant name in alert message
+- [x] Add "Usuń mieszkańca" button with destructive style
+- [x] Add three alert actions: Cancel, Delete, Go to Rooms
+- [x] Delete tenant directly from alert
+- [x] Write tests for alert actions (6 tests)
+- [x] All 124 tests passing

@@ -258,14 +258,21 @@ export default function AddressDetailsScreen() {
   const handleBackPress = () => {
     // Check if there are unassigned tenants
     if (address.unassignedTenants && address.unassignedTenants.length > 0) {
+      const firstTenant = address.unassignedTenants[0];
+      const tenantName = `${firstTenant.firstName} ${firstTenant.lastName}`;
       Alert.alert(
-        'Niezakończona operacja',
-        `Masz ${address.unassignedTenants.length} mieszkańca/ów bez przydzielonego miejsca. Przejdź do karty "Pokoje" i przydziel im pokoje, aby zakończyć operację.`,
+        'Niezakończona operacja zaselenia',
+        `Mieszkaniec ${tenantName} nie ma przydzielonego miejsca. Przejdź do karty Pokoje i wybierz dla niego pokój, lub usuń go, jeśli został dodany przez pomyłkę.`,
         [
           {
             text: 'Anuluj',
             onPress: () => {},
             style: 'cancel',
+          },
+          {
+            text: 'Usuń mieszkańca',
+            onPress: () => handleDeleteTenant(firstTenant),
+            style: 'destructive',
           },
           {
             text: 'Przejdź do Pokojów',
