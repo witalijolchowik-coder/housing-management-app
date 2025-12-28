@@ -63,24 +63,35 @@ export function ProjectFormModal({
     }
 
     try {
+      console.log('Starting CSV import...');
       const result = await DocumentPicker.getDocumentAsync({
         type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel'],
       });
 
-      if (result.canceled) return;
+      if (result.canceled) {
+        console.log('Document picker canceled');
+        return;
+      }
 
       setLoading(true);
       const fileUri = result.assets[0].uri;
+      console.log('File URI:', fileUri);
+      
       const csvText = await FileSystem.readAsStringAsync(fileUri);
+      console.log('CSV text length:', csvText.length);
+      console.log('First 200 chars:', csvText.substring(0, 200));
       
       const rows = parseCSV(csvText);
+      console.log('Parsed rows count:', rows.length);
       if (rows.length === 0) {
         Alert.alert('Błąd', 'Nie udało się odczytać danych z pliku CSV');
         setLoading(false);
         return;
       }
 
+      console.log('Processing CSV data...');
       const newProject = processCSVData(name.trim(), city.trim() || undefined, rows);
+      console.log('New project created with', newProject.addresses.length, 'addresses');
       
       const projects = await loadData();
       projects.push(newProject);
@@ -97,7 +108,9 @@ export function ProjectFormModal({
       // In a real app, we might want a callback like onImportComplete.
     } catch (error) {
       console.error('Error importing CSV:', error);
-      Alert.alert('Błąd', 'Wystąpił błąd podczas importu pliku CSV');
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      Alert.alert('Błąd', `Wystąpił błąd podczas importu pliku CSV: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setLoading(false);
     }

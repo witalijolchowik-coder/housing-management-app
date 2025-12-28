@@ -51,18 +51,19 @@ export const processCSVData = (projectName: string, city: string | undefined, ro
     // Example: "ul. Kolejowa, 28 59-730 Wykroty" -> "ul. Kolejowa 28"
     const addressParts = fullAddressStr.split(',');
     let streetPart = addressParts[0].trim();
-    let numberPart = '';
+    let addressName = streetPart; // Default to street part
     
-    if (addressParts.length > 1) {
-      // Check if the second part starts with a number (like " 28 59-730 Wykroty")
+    // Check if street part already contains a number at the end
+    const streetMatch = streetPart.match(/(\d+)\s*$/);
+    if (!streetMatch && addressParts.length > 1) {
+      // No number in street part, check if the second part starts with a number
       const secondPart = addressParts[1].trim();
       const match = secondPart.match(/^(\d+)/);
       if (match) {
-        numberPart = match[1];
+        addressName = `${streetPart} ${match[1]}`;
       }
     }
-
-    const addressName = numberPart ? `${streetPart} ${numberPart}` : streetPart;
+    // If street part already has a number, use it as is
 
     if (!addressMap.has(addressName)) {
       const newAddress: Address = {
@@ -191,17 +192,19 @@ export const importCSVIntoProject = (
     // Extract address name
     const addressParts = fullAddressStr.split(',');
     let streetPart = addressParts[0].trim();
-    let numberPart = '';
+    let addressName = streetPart; // Default to street part
     
-    if (addressParts.length > 1) {
+    // Check if street part already contains a number at the end
+    const streetMatch = streetPart.match(/(\d+)\s*$/);
+    if (!streetMatch && addressParts.length > 1) {
+      // No number in street part, check if the second part starts with a number
       const secondPart = addressParts[1].trim();
       const match = secondPart.match(/^(\d+)/);
       if (match) {
-        numberPart = match[1];
+        addressName = `${streetPart} ${match[1]}`;
       }
     }
-
-    const addressName = numberPart ? `${streetPart} ${numberPart}` : streetPart;
+    // If street part already has a number, use it as is
     const normalizedAddr = normalizeAddress(fullAddressStr);
 
     // Check if user provided a mapping for this address
@@ -301,17 +304,19 @@ export const groupCSVByAddress = (rows: CSVRow[]): AddressGroup[] => {
       // Extract address name
       const addressParts = fullAddressStr.split(',');
       let streetPart = addressParts[0].trim();
-      let numberPart = '';
+      let addressName = streetPart; // Default to street part
       
-      if (addressParts.length > 1) {
+      // Check if street part already contains a number at the end
+      const streetMatch = streetPart.match(/(\d+)\s*$/);
+      if (!streetMatch && addressParts.length > 1) {
+        // No number in street part, check if the second part starts with a number
         const secondPart = addressParts[1].trim();
         const match = secondPart.match(/^(\d+)/);
         if (match) {
-          numberPart = match[1];
+          addressName = `${streetPart} ${match[1]}`;
         }
       }
-
-      const addressName = numberPart ? `${streetPart} ${numberPart}` : streetPart;
+      // If street part already has a number, use it as is
 
       groups.set(normalizedAddr, {
         fullAddress: fullAddressStr,
