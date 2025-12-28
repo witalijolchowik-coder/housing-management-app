@@ -239,7 +239,7 @@ export default function AddressListScreen() {
                 <View className="flex-row items-center gap-1.5">
                   <Text className="text-base">♂️</Text>
                   <Text className="text-sm font-semibold text-foreground">
-                    {genderStats.male.total}<Text className="text-muted">/</Text><Text className="text-primary">{genderStats.male.vacant}</Text>
+                    {genderStats.male.total}<Text className="text-muted">/</Text>{genderStats.male.vacant}
                   </Text>
                 </View>
                 
@@ -247,7 +247,7 @@ export default function AddressListScreen() {
                 <View className="flex-row items-center gap-1.5">
                   <Text className="text-base">♀️</Text>
                   <Text className="text-sm font-semibold text-foreground">
-                    {genderStats.female.total}<Text className="text-muted">/</Text><Text className="text-primary">{genderStats.female.vacant}</Text>
+                    {genderStats.female.total}<Text className="text-muted">/</Text>{genderStats.female.vacant}
                   </Text>
                 </View>
 
@@ -255,16 +255,16 @@ export default function AddressListScreen() {
                 <View className="flex-row items-center gap-1.5">
                   <Text className="text-base">❤️</Text>
                   <Text className="text-sm font-semibold text-foreground">
-                    {genderStats.couple.total}<Text className="text-muted">/</Text><Text className="text-primary">{genderStats.couple.vacant}</Text>
+                    {genderStats.couple.total}<Text className="text-muted">/</Text>{genderStats.couple.vacant}
                   </Text>
                 </View>
 
                 {/* Other/Undefined */}
                 {genderStats.other.total > 0 && (
                   <View className="flex-row items-center gap-1.5">
-                    <Text className="text-base">❓</Text>
+                    <Text className="text-base">⚧️</Text>
                     <Text className="text-sm font-semibold text-foreground">
-                      {genderStats.other.total}<Text className="text-muted">/</Text><Text className="text-primary">{genderStats.other.vacant}</Text>
+                      {genderStats.other.total}<Text className="text-muted">/</Text>{genderStats.other.vacant}
                     </Text>
                   </View>
                 )}
