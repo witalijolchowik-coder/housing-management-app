@@ -17,43 +17,16 @@ export function SettingsMenuModal({ visible, onClose, onDataChanged }: SettingsM
 
   const handleExportData = async () => {
     try {
-      // Load all data
       const projects = await loadData();
-      const evictionArchive = await loadEvictionArchive();
-
-      // Create export object
-      const exportData = {
-        version: '1.0',
-        exportDate: new Date().toISOString(),
-        projects,
-        evictionArchive,
-      };
-
-      // Convert to JSON
-      const jsonString = JSON.stringify(exportData, null, 2);
-
-      // Create file path
-      const fileName = `housing-manager-backup-${new Date().toISOString().split('T')[0]}.json`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-
-      // Write file
-      await FileSystem.writeAsStringAsync(fileUri, jsonString, {
+      const archive = await loadEvictionArchive();
+      const data = { projects, archive };
+      const fileUri = FileSystem.documentDirectory + 'housing_data_export.json';
+      
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(data, null, 2), {
         encoding: FileSystem.EncodingType.UTF8,
       });
 
-      // Share file
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Eksportuj dane',
-        });
-        
-        Alert.alert('Sukces', 'Dane zostały wyeksportowane pomyślnie');
-      } else {
-        Alert.alert('Błąd', 'Udostępnianie plików nie jest dostępne na tym urządzeniu');
-      }
-
-      onClose();
+      await Sharing.shareAsync(fileUri);
     } catch (error) {
       console.error('Export error:', error);
       Alert.alert('Błąd', 'Nie udało się wyeksportować danych');
@@ -99,31 +72,20 @@ export function SettingsMenuModal({ visible, onClose, onDataChanged }: SettingsM
             text: 'Importuj',
             style: 'destructive',
             onPress: async () => {
-              try {
-                // Save imported data
-                await saveData(importData.projects);
-                if (importData.evictionArchive) {
-                  await saveEvictionArchive(importData.evictionArchive);
-                }
-
-                Alert.alert('Sukces', 'Dane zostały zaimportowane pomyślnie');
-                onClose();
-                
-                // Notify parent to reload data
-                if (onDataChanged) {
-                  onDataChanged();
-                }
-              } catch (error) {
-                console.error('Import save error:', error);
-                Alert.alert('Błąd', 'Nie udało się zapisać zaimportowanych danych');
+              await saveData(importData.projects);
+              if (importData.archive) {
+                await saveEvictionArchive(importData.archive);
               }
+              Alert.alert('Sukces', 'Dane zostały zaimportowane');
+              onDataChanged?.();
+              onClose();
             },
           },
         ]
       );
     } catch (error) {
       console.error('Import error:', error);
-      Alert.alert('Błąd', 'Nie udało się zaimportować danych. Sprawdź, czy plik jest prawidłowy.');
+      Alert.alert('Błąd', 'Nie udało się zaimportować dane. Upewnij się, że plik jest poprawny.');
     }
   };
 
@@ -135,66 +97,56 @@ export function SettingsMenuModal({ visible, onClose, onDataChanged }: SettingsM
       onRequestClose={onClose}
     >
       <Pressable 
-        className="flex-1 bg-black/50 justify-center items-center"
+        className="flex-1 bg-black/50 justify-center items-center p-4"
         onPress={onClose}
       >
         <Pressable 
-          className="bg-surface rounded-2xl w-80 overflow-hidden"
+          className="w-full max-w-sm rounded-2xl overflow-hidden"
+          style={{ backgroundColor: colors.card }}
           onPress={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <View className="px-6 py-4 border-b border-border">
-            <Text className="text-lg font-bold text-foreground">Ustawienia</Text>
-          </View>
+          <View className="p-6">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text 
+                className="text-xl font-bold"
+                style={{ color: colors.text }}
+              >
+                Ustawienia
+              </Text>
+              <Pressable onPress={onClose}>
+                <MaterialIcons name="close" size={24} color={colors.textSecondary} />
+              </Pressable>
+            </View>
 
-          {/* Menu Options */}
-          <View className="py-2">
-            {/* Export Data */}
-            <Pressable
-              onPress={handleExportData}
-              style={({ pressed }) => ({
-                opacity: pressed ? 0.7 : 1,
-              })}
-              className="flex-row items-center px-6 py-4"
-            >
-              <View className="bg-primary/20 rounded-full p-2 mr-4">
+            <View className="space-y-4">
+              <Pressable
+                className="flex-row items-center p-4 rounded-xl"
+                style={{ backgroundColor: colors.background }}
+                onPress={handleExportData}
+              >
+                <MaterialIcons name="file-download" size={24} color={colors.primary} />
+                <Text 
+                  className="ml-3 font-medium"
+                  style={{ color: colors.text }}
+                >
+                  Eksportuj dane (JSON)
+                </Text>
+              </Pressable>
+
+              <Pressable
+                className="flex-row items-center p-4 rounded-xl"
+                style={{ backgroundColor: colors.background }}
+                onPress={handleImportData}
+              >
                 <MaterialIcons name="file-upload" size={24} color={colors.primary} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-semibold text-foreground">Eksportuj dane</Text>
-                <Text className="text-sm text-muted mt-0.5">Zapisz kopię zapasową wszystkich danych</Text>
-              </View>
-            </Pressable>
-
-            {/* Import Data */}
-            <Pressable
-              onPress={handleImportData}
-              style={({ pressed }) => ({
-                opacity: pressed ? 0.7 : 1,
-              })}
-              className="flex-row items-center px-6 py-4"
-            >
-              <View className="bg-success/20 rounded-full p-2 mr-4">
-                <MaterialIcons name="file-download" size={24} color={colors.success} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-semibold text-foreground">Importuj dane</Text>
-                <Text className="text-sm text-muted mt-0.5">Wczytaj dane z pliku kopii zapasowej</Text>
-              </View>
-            </Pressable>
-          </View>
-
-          {/* Cancel Button */}
-          <View className="px-6 py-4 border-t border-border">
-            <Pressable
-              onPress={onClose}
-              style={({ pressed }) => ({
-                opacity: pressed ? 0.7 : 1,
-              })}
-              className="bg-surfaceVariant rounded-full py-3"
-            >
-              <Text className="text-center text-base font-semibold text-foreground">Anuluj</Text>
-            </Pressable>
+                <Text 
+                  className="ml-3 font-medium"
+                  style={{ color: colors.text }}
+                >
+                  Importuj dane (JSON)
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </Pressable>
       </Pressable>

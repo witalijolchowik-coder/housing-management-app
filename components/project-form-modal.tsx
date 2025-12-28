@@ -5,7 +5,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useTranslations } from '@/hooks/use-translations';
 import { Project } from '@/types';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { parseCSV, processCSVData } from '@/lib/csv-import';
 import { loadData, saveData } from '@/lib/store';
 
