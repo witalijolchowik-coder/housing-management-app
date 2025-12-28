@@ -269,7 +269,7 @@ export default function AddressListScreen() {
                 {/* Other/Undefined */}
                 {genderStats.other.total > 0 && (
                   <View className="flex-row items-center gap-1.5">
-                    <Text className="text-base">❓</Text>
+                    <Text className="text-base">⚧️</Text>
                     <Text className="text-sm font-bold text-foreground">
                       {genderStats.other.vacant} <Text className="text-muted font-normal">({genderStats.other.total})</Text>
                     </Text>
