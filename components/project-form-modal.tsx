@@ -87,6 +87,10 @@ export function ProjectFormModal({
       await saveData(projects);
 
       Alert.alert('Sukces', `Zaimportowano projekt z ${newProject.addresses.length} adresami`);
+      
+      // We need to notify the parent to refresh
+      // Since we don't have a direct callback, we'll rely on the fact that 
+      // the parent should reload data when it gains focus or when projects change.
       onClose();
       // We need to trigger a refresh in the parent, but since we're using saveData directly here, 
       // the parent's useFocusEffect or similar should handle it if it re-renders.

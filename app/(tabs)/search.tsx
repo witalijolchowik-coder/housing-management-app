@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Project, Tenant } from '@/types';
-import { loadData, loadEvictionArchive, restoreTenantFromArchive } from '@/lib/store';
+import { loadData, loadEvictionArchive, restoreTenantFromArchive, generateId } from '@/lib/store';
 import { RestoreTenantDialog } from '@/components/restore-tenant-dialog';
 import { getEvictionReasonLabel } from '@/lib/eviction-reasons';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -156,16 +156,16 @@ export default function SearchScreen() {
           ) {
             // Create tenant object from archive entry
             const archivedTenant: TenantWithHistory = {
-              id: entry.tenantId,
-              firstName: entry.firstName,
-              lastName: entry.lastName,
-              gender: entry.gender,
-              birthYear: entry.birthYear,
-              checkInDate: entry.checkInDate,
-              monthlyPrice: entry.monthlyPrice,
+              id: entry.tenantId || generateId(),
+              firstName: entry.firstName || 'Nieznany',
+              lastName: entry.lastName || 'Mieszkaniec',
+              gender: entry.gender || 'male',
+              birthYear: entry.birthYear || 1995,
+              checkInDate: entry.checkInDate || '-',
+              monthlyPrice: entry.monthlyPrice || 0,
               phone: entry.phone,
-              projectName: entry.projectName,
-              addressName: entry.addressName,
+              projectName: entry.projectName || '-',
+              addressName: entry.addressName || '-',
               roomNumber: entry.roomName || '-',
               currentAddress: 'Archiwum',
               currentRoom: entry.roomName || '-',
@@ -173,9 +173,9 @@ export default function SearchScreen() {
               evictionDate: entry.checkOutDate,
               evictionReason: entry.reason,
               history: [{
-                projectName: entry.projectName,
-                addressName: entry.addressName,
-                checkInDate: entry.checkInDate,
+                projectName: entry.projectName || '-',
+                addressName: entry.addressName || '-',
+                checkInDate: entry.checkInDate || '-',
                 checkOutDate: entry.checkOutDate,
               }],
             };

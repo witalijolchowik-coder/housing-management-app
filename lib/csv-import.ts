@@ -262,6 +262,10 @@ export const importCSVIntoProject = (
       phone: row['numer viber'] || undefined,
     };
 
+    // Ensure unassignedTenants exists
+    if (!targetAddress.unassignedTenants) {
+      targetAddress.unassignedTenants = [];
+    }
     targetAddress.unassignedTenants.push(tenant);
   });
 

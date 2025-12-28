@@ -194,7 +194,13 @@ export default function DashboardScreen() {
       if (index !== -1) {
         projects[index] = updatedProject;
         await saveData(projects);
+        
+        // Update local state immediately
+        setProjects([...projects]);
+        
+        // Reload all data to ensure consistency
         await loadProjects();
+        
         Alert.alert('Sukces', 'Dane zostały zaimportowane');
       }
     } catch (error) {
