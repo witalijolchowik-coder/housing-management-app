@@ -171,7 +171,10 @@ export default function AddressDetailsScreen() {
           <View className="justify-center items-end gap-1">
             <Text className="text-sm font-semibold text-foreground">{item.monthlyPrice} zł</Text>
             {item.spaceId ? (
-              <Text className="text-xs text-muted">Pokój {getRoomName(item.spaceId)}</Text>
+              <View className="flex-row items-center gap-1">
+                <MaterialIcons name="vpn-key" size={12} color={colors.muted} />
+                <Text className="text-xs text-muted">{getRoomName(item.spaceId)}</Text>
+              </View>
             ) : (
               <Text className="text-xs text-error font-semibold">Bez miejsca</Text>
             )}
