@@ -36,6 +36,7 @@ export default function DashboardScreen() {
   const [pendingCSVGroups, setPendingCSVGroups] = useState<AddressGroup[]>([]);
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
   const [addressMappings, setAddressMappings] = useState<Map<string, string>>(new Map());
+  const [pendingCSVRows, setPendingCSVRows] = useState<any[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -165,6 +166,7 @@ export default function DashboardScreen() {
 
       if (groupsWithConflicts.length > 0) {
         // Show dialog for first conflict
+        setPendingCSVRows(rows); // Store rows for later import
         setPendingCSVGroups(groupsWithConflicts);
         setCurrentGroupIndex(0);
         setAddressMappings(mappings);
@@ -201,7 +203,7 @@ export default function DashboardScreen() {
     }
   };
 
-  const handleAddressMatch = (addressId: string) => {
+  const handleAddressMatch = async (addressId: string) => {
     if (!selectedProject) return;
     
     const currentGroup = pendingCSVGroups[currentGroupIndex];
@@ -215,19 +217,30 @@ export default function DashboardScreen() {
     } else {
       // All conflicts resolved, perform import
       setCSVImportDialogVisible(false);
-      // We need to re-parse the CSV since we only stored groups
-      // In a real implementation, we'd store the full parsed data
-      Alert.alert('Info', 'Import będzie kontynuowany z wybranymi adresami');
+      await performImport(selectedProject, pendingCSVRows, newMappings);
+      // Reset state
+      setPendingCSVRows([]);
+      setPendingCSVGroups([]);
+      setCurrentGroupIndex(0);
+      setAddressMappings(new Map());
     }
   };
 
-  const handleCreateNewAddress = () => {
+  const handleCreateNewAddress = async () => {
+    if (!selectedProject) return;
+    
     // Don't add mapping, let it create new address
     if (currentGroupIndex < pendingCSVGroups.length - 1) {
       setCurrentGroupIndex(currentGroupIndex + 1);
     } else {
+      // All conflicts resolved, perform import
       setCSVImportDialogVisible(false);
-      Alert.alert('Info', 'Import będzie kontynuowany z nowymi adresami');
+      await performImport(selectedProject, pendingCSVRows, addressMappings);
+      // Reset state
+      setPendingCSVRows([]);
+      setPendingCSVGroups([]);
+      setCurrentGroupIndex(0);
+      setAddressMappings(new Map());
     }
   };
 

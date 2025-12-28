@@ -196,6 +196,7 @@ export const addToEvictionArchive = async (
   projectName: string,
   addressId: string,
   addressName: string,
+  roomName: string | undefined,
   checkOutDate: string,
   reason: any
 ): Promise<void> => {
@@ -205,10 +206,15 @@ export const addToEvictionArchive = async (
     tenantId: tenant.id,
     firstName: tenant.firstName,
     lastName: tenant.lastName,
+    gender: tenant.gender,
+    birthYear: tenant.birthYear,
+    monthlyPrice: tenant.monthlyPrice,
+    phone: tenant.phone,
     projectId,
     projectName,
     addressId,
     addressName,
+    roomName,
     checkInDate: tenant.checkInDate,
     checkOutDate,
     reason,
@@ -690,6 +696,7 @@ export const checkOutTenant = async (
   const address = projects[projectIndex].addresses[addressIndex];
   let tenant: Tenant | undefined;
   let spaceId: string | undefined;
+  let roomName: string | undefined;
 
   // Find and remove tenant
   for (const room of address.rooms) {
@@ -697,6 +704,7 @@ export const checkOutTenant = async (
       if (space.tenant?.id === tenantId) {
         tenant = space.tenant;
         spaceId = space.id;
+        roomName = room.name;
         space.tenant = undefined;
         space.status = 'vacant';
         break;
@@ -708,7 +716,7 @@ export const checkOutTenant = async (
   if (!tenant) throw new Error('Tenant not found');
 
   // Add to eviction archive
-  await addToEvictionArchive(tenant, projectId, projects[projectIndex].name, addressId, address.name, checkoutDate, reason);
+  await addToEvictionArchive(tenant, projectId, projects[projectIndex].name, addressId, address.name, roomName, checkoutDate, reason);
 
   await saveData(projects);
 };
@@ -949,12 +957,12 @@ export const restoreTenantFromArchive = async (
       id: generateId(), // New ID for restored tenant
       firstName: entry.firstName,
       lastName: entry.lastName,
-      gender: 'male', // Default, will need to be updated manually if needed
-      birthYear: new Date().getFullYear() - 30, // Default, will need to be updated manually
+      gender: entry.gender,
+      birthYear: entry.birthYear,
       checkInDate: new Date().toISOString().split('T')[0], // Today's date
       workStartDate: undefined,
-      monthlyPrice: projects[projectIndex].addresses[addressIndex].pricePerSpace || 0,
-      phone: undefined,
+      monthlyPrice: entry.monthlyPrice || projects[projectIndex].addresses[addressIndex].pricePerSpace || 0,
+      phone: entry.phone,
     };
     
     // Add to unassignedTenants

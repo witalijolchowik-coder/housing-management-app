@@ -25,10 +25,15 @@ export interface EvictionArchive {
   tenantId: string;
   firstName: string;
   lastName: string;
+  gender: Gender;
+  birthYear: number;
+  monthlyPrice: number;
+  phone?: string;
   projectId: string;
   projectName: string;
   addressId: string;
   addressName: string;
+  roomName?: string;
   checkInDate: string;
   checkOutDate: string;
   reason: EvictionReason;

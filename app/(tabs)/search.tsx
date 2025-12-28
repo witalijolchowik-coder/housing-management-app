@@ -9,6 +9,7 @@ import { useColors } from '@/hooks/use-colors';
 import { Project, Tenant } from '@/types';
 import { loadData, loadEvictionArchive, restoreTenantFromArchive } from '@/lib/store';
 import { RestoreTenantDialog } from '@/components/restore-tenant-dialog';
+import { getEvictionReasonLabel } from '@/lib/eviction-reasons';
 import { MaterialIcons } from '@expo/vector-icons';
 
 interface TenantWithHistory extends Tenant {
@@ -158,15 +159,16 @@ export default function SearchScreen() {
               id: entry.tenantId,
               firstName: entry.firstName,
               lastName: entry.lastName,
-              gender: 'male', // Default, not stored in archive
-              birthYear: 0, // Not stored in archive
+              gender: entry.gender,
+              birthYear: entry.birthYear,
               checkInDate: entry.checkInDate,
-              monthlyPrice: 0, // Not stored in archive
+              monthlyPrice: entry.monthlyPrice,
+              phone: entry.phone,
               projectName: entry.projectName,
               addressName: entry.addressName,
-              roomNumber: '-',
+              roomNumber: entry.roomName || '-',
               currentAddress: 'Archiwum',
-              currentRoom: '-',
+              currentRoom: entry.roomName || '-',
               isArchived: true,
               evictionDate: entry.checkOutDate,
               evictionReason: entry.reason,
@@ -277,9 +279,18 @@ export default function SearchScreen() {
           {/* Archived Badge */}
           {selectedTenant.isArchived && (
             <Card className="p-4 mb-4 bg-warning/10 border-warning">
-              <View className="flex-row items-center gap-2 mb-3">
-                <MaterialIcons name="archive" size={20} color={colors.warning} />
-                <Text className="text-sm font-semibold" style={{ color: colors.warning }}>Archiwum</Text>
+              <View className="flex-row items-center justify-between mb-3">
+                <View className="flex-row items-center gap-2">
+                  <MaterialIcons name="archive" size={20} color={colors.warning} />
+                  <Text className="text-sm font-semibold" style={{ color: colors.warning }}>Archiwum</Text>
+                </View>
+                {selectedTenant.evictionReason && (
+                  <Badge
+                    variant="error"
+                    size="sm"
+                    label={getEvictionReasonLabel(selectedTenant.evictionReason)}
+                  />
+                )}
               </View>
               <View className="gap-2">
                 <View className="flex-row justify-between">
@@ -287,8 +298,10 @@ export default function SearchScreen() {
                   <Text className="text-sm font-semibold text-foreground">{selectedTenant.evictionDate}</Text>
                 </View>
                 <View className="flex-row justify-between">
-                  <Text className="text-sm text-muted">Powód</Text>
-                  <Text className="text-sm font-semibold text-foreground">{selectedTenant.evictionReason}</Text>
+                  <Text className="text-sm text-muted">Powód wymeldowania</Text>
+                  <Text className="text-sm font-semibold text-foreground">
+                    {selectedTenant.evictionReason ? getEvictionReasonLabel(selectedTenant.evictionReason) : '-'}
+                  </Text>
                 </View>
               </View>
               
