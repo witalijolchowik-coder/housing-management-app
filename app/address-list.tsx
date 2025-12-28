@@ -199,8 +199,8 @@ export default function AddressListScreen() {
                   />
                 ) : (
                   <Image 
-                    source={require('@/assets/images/icon.png')} 
-                    style={{ width: 48, height: 48, tintColor: colors.muted }}
+                    source={require('@/assets/images/address-placeholder.png')} 
+                    style={{ width: 64, height: 64 }}
                     resizeMode="contain"
                   />
                 )}
