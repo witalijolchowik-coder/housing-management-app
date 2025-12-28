@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View, Text, TextInput, ScrollView, Pressable, Alert } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
@@ -24,15 +24,19 @@ export default function AddTenantScreen() {
   const router = useRouter();
   const { projectId, addressId, tenantId } = useLocalSearchParams();
   const isEditing = !!tenantId;
+  const yearScrollViewRef = useRef<ScrollView>(null);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [gender, setGender] = useState<Gender>('male');
-  const [birthYear, setBirthYear] = useState(new Date().getFullYear() - 30);
+  const [birthYear, setBirthYear] = useState(1995); // Default to 1995 as requested
   const [checkInDate, setCheckInDate] = useState('');
   const [workStartDate, setWorkStartDate] = useState('');
   const [monthlyPrice, setMonthlyPrice] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 100 }, (_, i) => currentYear - 80 + i);
 
   // Load tenant data if editing
   useEffect(() => {
@@ -40,6 +44,25 @@ export default function AddTenantScreen() {
       loadTenantData();
     }
   }, [isEditing, tenantId]);
+
+  // Auto-scroll to selected year
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (yearScrollViewRef.current) {
+        const index = yearOptions.indexOf(birthYear);
+        if (index !== -1) {
+          // Each year item is roughly 50-60px wide (padding + text)
+          // We'll use a rough estimate for the scroll position
+          yearScrollViewRef.current.scrollTo({
+            x: index * 54, // Approximate width of each year item
+            animated: true,
+          });
+        }
+      }
+    }, 500); // Small delay to ensure layout is ready
+
+    return () => clearTimeout(timer);
+  }, [birthYear]);
 
   const loadTenantData = async () => {
     try {
@@ -172,7 +195,7 @@ export default function AddTenantScreen() {
       router.back();
     } catch (error) {
       console.error('Error saving tenant:', error);
-      Alert.alert('Błąd', isEditing ? 'Nie удалось zaktualizować danych' : 'Nie udało się dodać mieszkańca');
+      Alert.alert('Błąd', isEditing ? 'Nie удалось zaktualizować данных' : 'Nie удалось dodać mieszkańca');
     } finally {
       setLoading(false);
     }
@@ -193,9 +216,6 @@ export default function AddTenantScreen() {
       />
     </View>
   ), [colors]);
-
-  const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 100 }, (_, i) => currentYear - 80 + i);
 
   return (
     <ScreenContainer className="p-4 pt-12 pb-20">
@@ -256,6 +276,7 @@ export default function AddTenantScreen() {
             <Text className="text-sm font-semibold text-foreground">Rok urodzenia</Text>
             <View className="bg-surfaceVariant rounded-lg overflow-hidden">
               <ScrollView
+                ref={yearScrollViewRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingHorizontal: 8 }}
@@ -316,7 +337,7 @@ export default function AddTenantScreen() {
             }`}
           >
             <Text className="text-white font-semibold">
-              {loading ? (isEditing ? 'Zapisywanie...' : 'Dodawanie...') : (isEditing ? 'Zapisz zmiany' : 'Dodaj mieszkańca')}
+              {loading ? (isEditing ? 'Zapisywanie...' : 'Dodawanie...') : (isEditing ? 'Zapisz изменения' : 'Dodaj mieszkańca')}
             </Text>
           </Pressable>
         </Card>
