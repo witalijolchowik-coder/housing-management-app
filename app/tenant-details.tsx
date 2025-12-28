@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, Pressable, Image } from 'react-native';
+import { ScrollView, Text, View, Pressable, Image, Linking } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
@@ -127,6 +127,12 @@ export default function TenantDetailsScreen() {
     other: t.resident.other,
   };
 
+  const handleCall = () => {
+    if (tenant.phone) {
+      Linking.openURL(`tel:${tenant.phone}`);
+    }
+  };
+
   return (
     <ScreenContainer className="p-4 pt-12 pb-20">
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
@@ -177,6 +183,18 @@ export default function TenantDetailsScreen() {
               {genderLabel[tenant.gender as keyof typeof genderLabel]}
             </Text>
           </View>
+          {tenant.phone && (
+            <Pressable 
+              onPress={handleCall}
+              className="flex-row justify-between items-center py-2 border-b border-border"
+            >
+              <Text className="text-sm text-muted">Telefon</Text>
+              <View className="flex-row items-center gap-2">
+                <MaterialIcons name="phone" size={16} color={colors.primary} />
+                <Text className="text-sm font-semibold text-primary">{tenant.phone}</Text>
+              </View>
+            </Pressable>
+          )}
           <View className="flex-row justify-between items-center py-2">
             <Text className="text-sm text-muted">Cena miesięczna</Text>
             <Text className="text-sm font-semibold text-foreground">{tenant.monthlyPrice} zł</Text>

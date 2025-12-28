@@ -33,6 +33,7 @@ export default function AddTenantScreen() {
   const [checkInDate, setCheckInDate] = useState('');
   const [workStartDate, setWorkStartDate] = useState('');
   const [monthlyPrice, setMonthlyPrice] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
   const currentYear = new Date().getFullYear();
@@ -94,6 +95,7 @@ export default function AddTenantScreen() {
         setCheckInDate(tenant.checkInDate);
         setWorkStartDate(tenant.workStartDate || '');
         setMonthlyPrice(tenant.monthlyPrice.toString());
+        setPhone(tenant.phone || '');
       }
     } catch (error) {
       console.error('Error loading tenant data:', error);
@@ -138,6 +140,7 @@ export default function AddTenantScreen() {
             checkInDate,
             workStartDate: workStartDate || undefined,
             monthlyPrice: parseFloat(monthlyPrice) || 0,
+            phone: phone.trim() || undefined,
           };
           tenantUpdated = true;
         }
@@ -156,6 +159,7 @@ export default function AddTenantScreen() {
                   checkInDate,
                   workStartDate: workStartDate || undefined,
                   monthlyPrice: parseFloat(monthlyPrice) || 0,
+                  phone: phone.trim() || undefined,
                 };
                 tenantUpdated = true;
                 break;
@@ -183,6 +187,7 @@ export default function AddTenantScreen() {
           checkInDate,
           workStartDate: workStartDate || undefined,
           monthlyPrice: parseFloat(monthlyPrice) || 0,
+          phone: phone.trim() || undefined,
         };
 
         // Add tenant to unassignedTenants array
@@ -195,11 +200,11 @@ export default function AddTenantScreen() {
       router.back();
     } catch (error) {
       console.error('Error saving tenant:', error);
-      Alert.alert('Błąd', isEditing ? 'Nie удалось zaktualizować данных' : 'Nie удалось dodać mieszkańca');
+      Alert.alert('Błąd', isEditing ? 'Nie удалось zaktualizować данных' : 'Nie udało się dodać mieszkańca');
     } finally {
       setLoading(false);
     }
-  }, [firstName, lastName, gender, birthYear, checkInDate, workStartDate, monthlyPrice, projectId, addressId, isEditing, tenantId]);
+  }, [firstName, lastName, gender, birthYear, checkInDate, workStartDate, monthlyPrice, phone, projectId, addressId, isEditing, tenantId]);
 
   const FormField = useCallback(({ label, value, onChangeText, placeholder, multiline = false, keyboardType = 'default', editable = true }: any) => (
     <View className="gap-2 mb-4">
@@ -299,6 +304,15 @@ export default function AddTenantScreen() {
             </View>
           </View>
 
+          {/* Phone */}
+          <FormField
+            label="Telefon"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="np. +48 123 456 789"
+            keyboardType="phone-pad"
+          />
+
           {/* Check-in Date */}
           <View className="gap-2 mb-4">
             <Text className="text-sm font-semibold text-foreground">Data zamelowania *</Text>
@@ -337,7 +351,7 @@ export default function AddTenantScreen() {
             }`}
           >
             <Text className="text-white font-semibold">
-              {loading ? (isEditing ? 'Zapisywanie...' : 'Dodawanie...') : (isEditing ? 'Zapisz изменения' : 'Dodaj mieszkańca')}
+              {loading ? (isEditing ? 'Zapisywanie...' : 'Dodawanie...') : (isEditing ? 'Zapisz zmiany' : 'Dodaj mieszkańca')}
             </Text>
           </Pressable>
         </Card>

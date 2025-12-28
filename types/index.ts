@@ -17,6 +17,7 @@ export interface Tenant {
   monthlyPrice: number;
   isCouple?: boolean; // If true, uses couplePrice instead of monthlyPrice
   photo?: string;
+  phone?: string;
 }
 
 export interface EvictionArchive {
@@ -147,6 +148,7 @@ export interface AddTenantFormData {
   workStartDate?: string;
   isCouple?: boolean;
   monthlyPrice: number;
+  phone?: string;
 }
 
 export interface AddAddressFormData {

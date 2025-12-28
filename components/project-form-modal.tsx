@@ -1,9 +1,13 @@
-import { View, Text, Pressable, Modal, ScrollView, TextInput } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useTranslations } from '@/hooks/use-translations';
 import { Project } from '@/types';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import { parseCSV, processCSVData } from '@/lib/csv-import';
+import { loadData, saveData } from '@/lib/store';
 
 interface ProjectFormModalProps {
   visible: boolean;
@@ -36,7 +40,7 @@ export function ProjectFormModal({
 
   const handleSave = async () => {
     if (!name.trim()) {
-      alert(t.messages.savingError);
+      Alert.alert('Błąd', t.messages.savingError);
       return;
     }
 
@@ -46,7 +50,50 @@ export function ProjectFormModal({
       onClose();
     } catch (error) {
       console.error('Error saving project:', error);
-      alert(t.messages.savingError);
+      Alert.alert('Błąd', t.messages.savingError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImportCSV = async () => {
+    if (!name.trim()) {
+      Alert.alert('Błąd', 'Proszę najpierw wpisać nazwę projektu');
+      return;
+    }
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel'],
+      });
+
+      if (result.canceled) return;
+
+      setLoading(true);
+      const fileUri = result.assets[0].uri;
+      const csvText = await FileSystem.readAsStringAsync(fileUri);
+      
+      const rows = parseCSV(csvText);
+      if (rows.length === 0) {
+        Alert.alert('Błąd', 'Nie udało się odczytać danych z pliku CSV');
+        setLoading(false);
+        return;
+      }
+
+      const newProject = processCSVData(name.trim(), city.trim() || undefined, rows);
+      
+      const projects = await loadData();
+      projects.push(newProject);
+      await saveData(projects);
+
+      Alert.alert('Sukces', `Zaimportowano projekt z ${newProject.addresses.length} adresami`);
+      onClose();
+      // We need to trigger a refresh in the parent, but since we're using saveData directly here, 
+      // the parent's useFocusEffect or similar should handle it if it re-renders.
+      // In a real app, we might want a callback like onImportComplete.
+    } catch (error) {
+      console.error('Error importing CSV:', error);
+      Alert.alert('Błąd', 'Wystąpił błąd podczas importu pliku CSV');
     } finally {
       setLoading(false);
     }
@@ -66,7 +113,7 @@ export function ProjectFormModal({
             <MaterialIcons name="close" size={24} color={colors.foreground} />
           </Pressable>
           <Text className="text-lg font-bold text-foreground">
-            {project ? t.forms.editAddress : t.forms.addAddress}
+            {project ? 'Edytuj projekt' : 'Nowy projekt'}
           </Text>
           <Pressable onPress={handleSave} disabled={loading}>
             <MaterialIcons 
@@ -108,6 +155,29 @@ export function ProjectFormModal({
               editable={!loading}
             />
           </View>
+
+          {!project && (
+            <View className="mt-6">
+              <Text className="text-sm font-semibold text-muted mb-3 uppercase tracking-wider">
+                Opcje zaawansowane
+              </Text>
+              <Pressable
+                onPress={handleImportCSV}
+                disabled={loading}
+                className="flex-row items-center gap-3 bg-surfaceVariant/40 border border-dashed border-primary/40 rounded-xl p-5"
+              >
+                <View className="bg-primary/10 p-3 rounded-full">
+                  <MaterialIcons name="file-upload" size={24} color={colors.primary} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-base font-bold text-foreground">Importuj z CSV</Text>
+                  <Text className="text-xs text-muted mt-1">
+                    Automatycznie utwórz adresy i dodaj mieszkańców z pliku
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
+          )}
         </ScrollView>
 
         {/* Save Button */}
@@ -120,7 +190,7 @@ export function ProjectFormModal({
             }`}
           >
             <Text className="text-white font-semibold">
-              {loading ? t.common.loading : t.forms.submit}
+              {loading ? t.common.loading : (project ? 'Zapisz zmiany' : 'Utwórz projekt')}
             </Text>
           </Pressable>
         </View>
