@@ -175,14 +175,18 @@ export default function AddressListScreen() {
               </View>
               <View className="flex-1 justify-between">
                 <View>
-                  <Text className="text-lg font-bold text-foreground">{item.name}</Text>
-                  <View className="flex-row items-center gap-2 mt-2 flex-wrap">
-                    <Text className="text-sm text-muted">{item.fullAddress}</Text>
+                  {/* Name and Operator Tag in one row */}
+                  <View className="flex-row items-center gap-2 flex-wrap">
+                    <Text className="text-lg font-bold text-foreground">{item.name}</Text>
                     {item.operator && (
                       <Badge variant="info" size="sm" label={getOperatorName()} />
                     )}
                   </View>
+                  
+                  {/* Full Address on next row */}
+                  <Text className="text-sm text-muted mt-1">{item.fullAddress}</Text>
                 </View>
+                
                 <View className="flex-col gap-2">
                   <View className="flex-row items-center gap-2">
                     <MaterialIcons name="person" size={16} color={colors.success} />
