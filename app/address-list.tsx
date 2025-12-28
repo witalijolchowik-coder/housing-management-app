@@ -163,14 +163,18 @@ export default function AddressListScreen() {
           <View className="gap-4">
             {/* Photo and Header */}
             <View className="flex-row gap-4">
-              <View className="w-24 h-24 rounded-2xl bg-surfaceVariant items-center justify-center">
+              <View className="w-24 h-24 rounded-2xl bg-surfaceVariant items-center justify-center overflow-hidden">
                 {item.photos && item.photos.length > 0 ? (
                   <Image
                     source={{ uri: item.photos[0] }}
                     className="w-full h-full rounded-lg"
                   />
                 ) : (
-                  <MaterialIcons name="home" size={40} color={colors.muted} />
+                  <Image 
+                    source={require('@/assets/images/icon.png')} 
+                    style={{ width: 48, height: 48, tintColor: colors.muted }}
+                    resizeMode="contain"
+                  />
                 )}
               </View>
               <View className="flex-1 justify-between">
