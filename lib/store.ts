@@ -364,6 +364,23 @@ export const deleteAddress = async (projectId: string, addressId: string): Promi
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
 
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
+
+  const address = projects[projectIndex].addresses[addressIndex];
+
+  // Check if there are any residents in rooms
+  const hasResidentsInRooms = address.rooms.some(room => 
+    room.spaces.some(space => space.tenant !== null && space.tenant !== undefined)
+  );
+
+  // Check if there are any unassigned residents
+  const hasUnassignedResidents = address.unassignedTenants && address.unassignedTenants.length > 0;
+
+  if (hasResidentsInRooms || hasUnassignedResidents) {
+    throw new Error('HAS_RESIDENTS');
+  }
+
   projects[projectIndex].addresses = projects[projectIndex].addresses.filter((a) => a.id !== addressId);
   await saveData(projects);
 };

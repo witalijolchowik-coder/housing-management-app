@@ -79,8 +79,15 @@ export default function AddressListScreen() {
               try {
                 await deleteAddress(projectId as string, selectedAddress.id);
                 await loadAddresses();
-              } catch (error) {
-                console.error('Error deleting address:', error);
+              } catch (error: any) {
+                if (error.message === 'HAS_RESIDENTS') {
+                  Alert.alert(
+                    'Błąd',
+                    'Na adresie są заселенные люди. Вначале выселите их, после чего адрес можно будет удалить.'
+                  );
+                } else {
+                  console.error('Error deleting address:', error);
+                }
               }
             },
             style: 'destructive',
