@@ -910,3 +910,64 @@ export const initializeDemoData = async (): Promise<void> => {
 
   await saveData(demoProjects);
 };
+
+/**
+ * Restore tenant from eviction archive to a project address
+ */
+export const restoreTenantFromArchive = async (
+  archiveEntryId: string,
+  projectId: string,
+  addressId: string
+): Promise<void> => {
+  try {
+    // Load archive and find entry
+    const archive = await loadEvictionArchive();
+    const entryIndex = archive.findIndex(e => e.id === archiveEntryId);
+    
+    if (entryIndex === -1) {
+      throw new Error('Archive entry not found');
+    }
+    
+    const entry = archive[entryIndex];
+    
+    // Load projects and find target address
+    const projects = await loadData();
+    const projectIndex = projects.findIndex(p => p.id === projectId);
+    
+    if (projectIndex === -1) {
+      throw new Error('Project not found');
+    }
+    
+    const addressIndex = projects[projectIndex].addresses.findIndex(a => a.id === addressId);
+    
+    if (addressIndex === -1) {
+      throw new Error('Address not found');
+    }
+    
+    // Create tenant object from archive entry
+    const restoredTenant: Tenant = {
+      id: generateId(), // New ID for restored tenant
+      firstName: entry.firstName,
+      lastName: entry.lastName,
+      gender: 'male', // Default, will need to be updated manually if needed
+      birthYear: new Date().getFullYear() - 30, // Default, will need to be updated manually
+      checkInDate: new Date().toISOString().split('T')[0], // Today's date
+      workStartDate: undefined,
+      monthlyPrice: projects[projectIndex].addresses[addressIndex].pricePerSpace || 0,
+      phone: undefined,
+    };
+    
+    // Add to unassignedTenants
+    projects[projectIndex].addresses[addressIndex].unassignedTenants.push(restoredTenant);
+    
+    // Save updated projects
+    await saveData(projects);
+    
+    // Remove from archive
+    archive.splice(entryIndex, 1);
+    await saveEvictionArchive(archive);
+  } catch (error) {
+    console.error('Error restoring tenant from archive:', error);
+    throw error;
+  }
+};

@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Project, Tenant } from '@/types';
-import { loadData, loadEvictionArchive } from '@/lib/store';
+import { loadData, loadEvictionArchive, restoreTenantFromArchive } from '@/lib/store';
+import { RestoreTenantDialog } from '@/components/restore-tenant-dialog';
 import { MaterialIcons } from '@expo/vector-icons';
 
 interface TenantWithHistory extends Tenant {
@@ -36,6 +37,8 @@ export default function SearchScreen() {
   const [selectedTenant, setSelectedTenant] = useState<TenantWithHistory | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchInArchive, setSearchInArchive] = useState(false);
+  const [restoreDialogVisible, setRestoreDialogVisible] = useState(false);
+  const [archiveEntryId, setArchiveEntryId] = useState<string>('');
 
   useFocusEffect(
     useCallback(() => {
@@ -198,6 +201,21 @@ export default function SearchScreen() {
     setSelectedTenant(null);
   };
 
+  const handleRestoreTenant = async (projectId: string, addressId: string) => {
+    try {
+      await restoreTenantFromArchive(archiveEntryId, projectId, addressId);
+      setRestoreDialogVisible(false);
+      setSelectedTenant(null);
+      Alert.alert('Sukces', 'Mieszkaniec został przywrócony do projektu');
+      // Reload data
+      await loadSearchData();
+      handleClearResults();
+    } catch (error) {
+      console.error('Error restoring tenant:', error);
+      Alert.alert('Błąd', 'Nie udało się przywrócić mieszkańca');
+    }
+  };
+
   const renderSearchResult = ({ item }: { item: TenantWithHistory }) => (
     <Pressable
       onPress={() => setSelectedTenant(item)}
@@ -276,17 +294,25 @@ export default function SearchScreen() {
               
               {/* Move to Project Button */}
               <Pressable
-                onPress={() => Alert.alert(
-                  'Przeniesienie do projektu',
-                  'Funkcja przeniesienia mieszkańca z archiwum do nowego projektu zostanie wkrótce dodana.',
-                  [{ text: 'OK' }]
-                )}
+                onPress={() => {
+                  // Find archive entry ID
+                  loadEvictionArchive().then(archive => {
+                    const entry = archive.find(e => 
+                      e.firstName === selectedTenant.firstName && 
+                      e.lastName === selectedTenant.lastName
+                    );
+                    if (entry) {
+                      setArchiveEntryId(entry.id);
+                      setRestoreDialogVisible(true);
+                    }
+                  });
+                }}
                 className="mt-4 bg-primary rounded-lg py-3 items-center"
                 style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
               >
                 <View className="flex-row items-center gap-2">
                   <MaterialIcons name="restore" size={20} color="white" />
-                  <Text className="text-sm font-semibold text-white">Przeń do projektu</Text>
+                  <Text className="text-sm font-semibold text-white">Przywróć do projektu</Text>
                 </View>
               </Pressable>
             </Card>
@@ -440,6 +466,15 @@ export default function SearchScreen() {
           contentContainerStyle={{ paddingBottom: 20 }}
         />
       )}
+
+      {/* Restore Tenant Dialog */}
+      <RestoreTenantDialog
+        visible={restoreDialogVisible}
+        tenantName={selectedTenant ? `${selectedTenant.firstName} ${selectedTenant.lastName}` : ''}
+        projects={projects}
+        onRestore={handleRestoreTenant}
+        onClose={() => setRestoreDialogVisible(false)}
+      />
     </ScreenContainer>
   );
 }

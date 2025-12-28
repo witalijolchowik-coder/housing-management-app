@@ -9,6 +9,7 @@ interface ProjectMenuModalProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onImportCSV: () => void;
 }
 
 export function ProjectMenuModal({
@@ -17,6 +18,7 @@ export function ProjectMenuModal({
   onClose,
   onEdit,
   onDelete,
+  onImportCSV,
 }: ProjectMenuModalProps) {
   const colors = useColors();
   const t = useTranslations();
@@ -54,6 +56,18 @@ export function ProjectMenuModal({
               >
                 <MaterialIcons name="edit" size={20} color={colors.primary} />
                 <Text className="text-foreground ml-3 flex-1">{t.common.edit}</Text>
+              </Pressable>
+
+              {/* Import CSV */}
+              <Pressable
+                onPress={() => {
+                  onImportCSV();
+                  onClose();
+                }}
+                className="flex-row items-center px-4 py-3 border-b border-border"
+              >
+                <MaterialIcons name="upload-file" size={20} color={colors.primary} />
+                <Text className="text-foreground ml-3 flex-1">Załaduj CSV</Text>
               </Pressable>
 
               {/* Delete */}

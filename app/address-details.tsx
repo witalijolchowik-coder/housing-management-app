@@ -516,7 +516,7 @@ export default function AddressDetailsScreen() {
                 await loadAddress();
                 setEvictionModalVisible(false);
                 setSelectedTenant(undefined);
-                alert(`Жилец переселен на адрес: ${targetAddr.name}`);
+                Alert.alert('Sukces', `Mieszkaniec przeniesiony na adres: ${targetAddr.name}`);
                 return;
               }
             }
@@ -561,10 +561,10 @@ export default function AddressDetailsScreen() {
             await loadAddress();
             setEvictionModalVisible(false);
             setSelectedTenant(undefined);
-            alert('Жилец успешно выселен');
+            Alert.alert('Sukces', 'Mieszkaniec został wyselony');
           } catch (error) {
             console.error('Error evicting tenant:', error);
-            alert('Ошибка при выселении');
+            Alert.alert('Błąd', 'Wystąpił błąd podczas wyselenia');
           }
         }}
       />

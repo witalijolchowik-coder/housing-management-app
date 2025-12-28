@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, Pressable, Image, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, Image, Linking } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
@@ -249,28 +249,23 @@ export default function TenantDetailsScreen() {
                         </Text>
                       )}
                     </View>
-                    {location.isCurrent && (
-                      <Badge variant="success" size="sm" label="Obecnie" />
-                    )}
-                  </View>
-                  <View className="flex-row items-center gap-2 mt-2 pt-2 border-t border-border">
-                    <MaterialIcons name="calendar-today" size={14} color={colors.muted} />
-                    <Text className="text-xs text-muted">
-                      {location.checkInDate}
-                      {location.checkOutDate && ` - ${location.checkOutDate}`}
-                    </Text>
+                    <View className="items-end">
+                      <View className="flex-row items-center gap-1">
+                        <MaterialIcons name="calendar-today" size={12} color={colors.muted} />
+                        <Text className="text-xs text-muted">{location.checkInDate}</Text>
+                      </View>
+                      {location.checkOutDate && (
+                        <View className="flex-row items-center gap-1 mt-1">
+                          <MaterialIcons name="event-busy" size={12} color={colors.muted} />
+                          <Text className="text-xs text-muted">{location.checkOutDate}</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
                 </Card>
               ))}
             </View>
           </>
-        )}
-
-        {/* No History */}
-        {locations.length === 0 && !currentLocation && (
-          <Card className="p-4 items-center">
-            <Text className="text-sm text-muted">Brak historii poselenia</Text>
-          </Card>
         )}
       </ScrollView>
     </ScreenContainer>

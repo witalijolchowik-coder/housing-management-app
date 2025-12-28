@@ -200,7 +200,7 @@ export default function AddTenantScreen() {
       router.back();
     } catch (error) {
       console.error('Error saving tenant:', error);
-      Alert.alert('Błąd', isEditing ? 'Nie удалось zaktualizować данных' : 'Nie udało się dodać mieszkańca');
+      Alert.alert('Błąd', isEditing ? 'Nie udało się zaktualizować danych' : 'Nie udało się dodać mieszkańca');
     } finally {
       setLoading(false);
     }
