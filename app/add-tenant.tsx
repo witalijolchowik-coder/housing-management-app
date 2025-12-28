@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View, Text, TextInput, ScrollView, Pressable, Alert } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
@@ -22,7 +22,8 @@ export default function AddTenantScreen() {
   const t = useTranslations();
   const colors = useColors();
   const router = useRouter();
-  const { projectId, addressId } = useLocalSearchParams();
+  const { projectId, addressId, tenantId } = useLocalSearchParams();
+  const isEditing = !!tenantId;
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -32,6 +33,49 @@ export default function AddTenantScreen() {
   const [workStartDate, setWorkStartDate] = useState('');
   const [monthlyPrice, setMonthlyPrice] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Load tenant data if editing
+  useEffect(() => {
+    if (isEditing) {
+      loadTenantData();
+    }
+  }, [isEditing, tenantId]);
+
+  const loadTenantData = async () => {
+    try {
+      const projects = await loadData();
+      const project = projects.find((p) => p.id === projectId);
+      if (!project) return;
+
+      const address = project.addresses.find((a) => a.id === addressId);
+      if (!address) return;
+
+      // Find tenant in unassignedTenants or in rooms
+      let tenant: Tenant | undefined = address.unassignedTenants.find((t) => t.id === tenantId);
+      
+      if (!tenant) {
+        for (const room of address.rooms) {
+          const space = room.spaces.find((s) => s.tenant?.id === tenantId);
+          if (space && space.tenant) {
+            tenant = space.tenant;
+            break;
+          }
+        }
+      }
+
+      if (tenant) {
+        setFirstName(tenant.firstName);
+        setLastName(tenant.lastName);
+        setGender(tenant.gender);
+        setBirthYear(tenant.birthYear);
+        setCheckInDate(tenant.checkInDate);
+        setWorkStartDate(tenant.workStartDate || '');
+        setMonthlyPrice(tenant.monthlyPrice.toString());
+      }
+    } catch (error) {
+      console.error('Error loading tenant data:', error);
+    }
+  };
 
   const handleSubmit = useCallback(async () => {
     if (!firstName.trim() || !lastName.trim() || !checkInDate || !monthlyPrice.trim()) {
@@ -55,33 +99,84 @@ export default function AddTenantScreen() {
         return;
       }
 
-      // Create new tenant WITHOUT room assignment
-      const newTenant: Tenant = {
-        id: generateUUID(),
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        gender,
-        birthYear,
-        checkInDate,
-        workStartDate: workStartDate || undefined,
-        monthlyPrice: parseFloat(monthlyPrice) || 0,
-      };
+      if (isEditing) {
+        // Update existing tenant
+        let tenantUpdated = false;
 
-      // Add tenant to unassignedTenants array
-      // Tenant will appear in the tenant list with status "Bez miejsca"
-      // User can later assign it to a space from the Pokoje tab
-      address.unassignedTenants.push(newTenant);
+        // Check unassignedTenants
+        const unassignedIndex = address.unassignedTenants.findIndex((t) => t.id === tenantId);
+        if (unassignedIndex !== -1) {
+          address.unassignedTenants[unassignedIndex] = {
+            ...address.unassignedTenants[unassignedIndex],
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            gender,
+            birthYear,
+            checkInDate,
+            workStartDate: workStartDate || undefined,
+            monthlyPrice: parseFloat(monthlyPrice) || 0,
+          };
+          tenantUpdated = true;
+        }
 
-      await saveData(projects);
-      Alert.alert('Sukces', `Mieszkaniec "${firstName} ${lastName}" dodany bez miejsca`);
+        // Check rooms if not found in unassigned
+        if (!tenantUpdated) {
+          for (const room of address.rooms) {
+            for (const space of room.spaces) {
+              if (space.tenant && space.tenant.id === tenantId) {
+                space.tenant = {
+                  ...space.tenant,
+                  firstName: firstName.trim(),
+                  lastName: lastName.trim(),
+                  gender,
+                  birthYear,
+                  checkInDate,
+                  workStartDate: workStartDate || undefined,
+                  monthlyPrice: parseFloat(monthlyPrice) || 0,
+                };
+                tenantUpdated = true;
+                break;
+              }
+            }
+            if (tenantUpdated) break;
+          }
+        }
+
+        if (!tenantUpdated) {
+          Alert.alert('Błąd', 'Mieszkaniec nie znaleziony');
+          return;
+        }
+
+        await saveData(projects);
+        Alert.alert('Sukces', `Dane mieszkańca "${firstName} ${lastName}" zostały zaktualizowane`);
+      } else {
+        // Create new tenant WITHOUT room assignment
+        const newTenant: Tenant = {
+          id: generateUUID(),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          gender,
+          birthYear,
+          checkInDate,
+          workStartDate: workStartDate || undefined,
+          monthlyPrice: parseFloat(monthlyPrice) || 0,
+        };
+
+        // Add tenant to unassignedTenants array
+        address.unassignedTenants.push(newTenant);
+
+        await saveData(projects);
+        Alert.alert('Sukces', `Mieszkaniec "${firstName} ${lastName}" dodany bez miejsca`);
+      }
+
       router.back();
     } catch (error) {
-      console.error('Error adding tenant:', error);
-      Alert.alert('Błąd', 'Nie udało się dodać mieszkańca');
+      console.error('Error saving tenant:', error);
+      Alert.alert('Błąd', isEditing ? 'Nie удалось zaktualizować danych' : 'Nie udało się dodać mieszkańca');
     } finally {
       setLoading(false);
     }
-  }, [firstName, lastName, gender, birthYear, checkInDate, workStartDate, monthlyPrice, projectId, addressId]);
+  }, [firstName, lastName, gender, birthYear, checkInDate, workStartDate, monthlyPrice, projectId, addressId, isEditing, tenantId]);
 
   const FormField = useCallback(({ label, value, onChangeText, placeholder, multiline = false, keyboardType = 'default', editable = true }: any) => (
     <View className="gap-2 mb-4">
@@ -113,7 +208,9 @@ export default function AddTenantScreen() {
           >
             <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
           </Pressable>
-          <Text className="text-2xl font-bold text-foreground flex-1">Dodaj mieszkańca</Text>
+          <Text className="text-2xl font-bold text-foreground flex-1">
+            {isEditing ? 'Edytuj mieszkańca' : 'Dodaj mieszkańca'}
+          </Text>
         </View>
 
         {/* Form */}
@@ -219,7 +316,7 @@ export default function AddTenantScreen() {
             }`}
           >
             <Text className="text-white font-semibold">
-              {loading ? 'Dodawanie...' : 'Dodaj mieszkańca'}
+              {loading ? (isEditing ? 'Zapisywanie...' : 'Dodawanie...') : (isEditing ? 'Zapisz zmiany' : 'Dodaj mieszkańca')}
             </Text>
           </Pressable>
         </Card>
