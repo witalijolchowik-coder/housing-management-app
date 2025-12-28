@@ -10,7 +10,7 @@ import { AddressMenuModal } from '@/components/address-menu-modal';
 import { AddressFormModal } from '@/components/address-form-modal';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Address, AddAddressFormData, OperatorType } from '@/types';
+import { Address, AddAddressFormData, OperatorType, Room } from '@/types';
 import { loadData, calculateAddressStats, addAddress, updateAddress, deleteAddress, putAddressOnWypowiedzenie, removeAddressFromWypowiedzenie } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -144,6 +144,34 @@ export default function AddressListScreen() {
       }
     }
     
+    // Calculate gender-based stats
+    const genderStats = {
+      male: { total: 0, vacant: 0 },
+      female: { total: 0, vacant: 0 },
+      couple: { total: 0, vacant: 0 },
+      other: { total: 0, vacant: 0 },
+    };
+
+    for (const room of item.rooms) {
+      const roomType = room.type || 'other';
+      const roomTotal = room.totalSpaces;
+      const roomVacant = room.spaces.filter(s => s.status === 'vacant').length;
+
+      if (roomType === 'male') {
+        genderStats.male.total += roomTotal;
+        genderStats.male.vacant += roomVacant;
+      } else if (roomType === 'female') {
+        genderStats.female.total += roomTotal;
+        genderStats.female.vacant += roomVacant;
+      } else if (roomType === 'couple') {
+        genderStats.couple.total += roomTotal;
+        genderStats.couple.vacant += roomVacant;
+      } else {
+        genderStats.other.total += roomTotal;
+        genderStats.other.vacant += roomVacant;
+      }
+    }
+
     // Get operator name
     const getOperatorName = () => {
       if (item.operator === 'rent_planet') return 'Rent Planet';
@@ -200,6 +228,46 @@ export default function AddressListScreen() {
                     <Badge variant="warning" size="sm" label="Wypowiedzenie" />
                   )}
                 </View>
+              </View>
+            </View>
+
+            {/* Gender-based Stats */}
+            <View className="pt-2 border-t border-border/30">
+              <Text className="text-xs font-bold text-muted mb-2 uppercase tracking-wider">Wolne miejsca</Text>
+              <View className="flex-row flex-wrap gap-x-4 gap-y-2">
+                {/* Male */}
+                <View className="flex-row items-center gap-1.5">
+                  <Text className="text-base">♂️</Text>
+                  <Text className="text-sm font-semibold text-foreground">
+                    {genderStats.male.total}<Text className="text-muted">/</Text><Text className="text-primary">{genderStats.male.vacant}</Text>
+                  </Text>
+                </View>
+                
+                {/* Female */}
+                <View className="flex-row items-center gap-1.5">
+                  <Text className="text-base">♀️</Text>
+                  <Text className="text-sm font-semibold text-foreground">
+                    {genderStats.female.total}<Text className="text-muted">/</Text><Text className="text-primary">{genderStats.female.vacant}</Text>
+                  </Text>
+                </View>
+
+                {/* Couple */}
+                <View className="flex-row items-center gap-1.5">
+                  <Text className="text-base">❤️</Text>
+                  <Text className="text-sm font-semibold text-foreground">
+                    {genderStats.couple.total}<Text className="text-muted">/</Text><Text className="text-primary">{genderStats.couple.vacant}</Text>
+                  </Text>
+                </View>
+
+                {/* Other/Undefined */}
+                {genderStats.other.total > 0 && (
+                  <View className="flex-row items-center gap-1.5">
+                    <Text className="text-base">❓</Text>
+                    <Text className="text-sm font-semibold text-foreground">
+                      {genderStats.other.total}<Text className="text-muted">/</Text><Text className="text-primary">{genderStats.other.vacant}</Text>
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
