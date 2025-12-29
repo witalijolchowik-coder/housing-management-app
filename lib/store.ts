@@ -14,23 +14,26 @@ export const calculateSpaceStats = (spaces: Space[]): SpaceStats => {
   return spaces.reduce(
     (acc, space) => {
       acc.total++;
-      switch (space.status) {
-        case 'vacant':
-          acc.vacant++;
-          break;
-        case 'occupied':
-          acc.occupied++;
-          if (space.tenant) {
-            acc.peopleCount++;
-          }
-          break;
-        case 'wypowiedzenie':
-          acc.wypowiedzenie++;
-          if (space.tenant) {
-            acc.peopleCount++;
-          }
-          break;
+      
+      // Zajęte = Razem - Wolne
+      // Wolne = vacant + (wypowiedzenie without tenant)
+      
+      const isWolne = space.status === 'vacant' || (space.status === 'wypowiedzenie' && !space.tenant);
+      
+      if (isWolne) {
+        acc.vacant++;
+      } else {
+        acc.occupied++;
       }
+
+      if (space.status === 'wypowiedzenie') {
+        acc.wypowiedzenie++;
+      }
+
+      if (space.tenant) {
+        acc.peopleCount++;
+      }
+
       return acc;
     },
     { total: 0, occupied: 0, vacant: 0, wypowiedzenie: 0, peopleCount: 0 }
@@ -44,9 +47,9 @@ export const calculateProjectStats = (project: Project): ProjectStats => {
   );
   const stats = calculateSpaceStats(allSpaces);
   
-  // Occupancy = (occupied + wypowiedzenie) / total
+  // Occupancy = occupied / total (where occupied already includes people on wypowiedzenie)
   const occupancyPercent = stats.total > 0 
-    ? Math.round(((stats.occupied + stats.wypowiedzenie) / stats.total) * 100) 
+    ? Math.round((stats.occupied / stats.total) * 100) 
     : 0;
   
   // Count conflicts
@@ -104,6 +107,9 @@ export const getConflicts = (project: Project): Conflict[] => {
 
     for (const room of address.rooms) {
       for (const space of room.spaces) {
+        // Skip conflicts for whole addresses if it's just an empty space
+        const isWholeAddress = address.isWholeAddress;
+
         // Type 1: Tenant without room
         if (space.tenant && !space.tenant.spaceId) {
           conflicts.push({
@@ -138,6 +144,23 @@ export const getConflicts = (project: Project): Conflict[] => {
               message: `Zwolnij miejsce lub przenieś ${space.tenant.firstName} ${space.tenant.lastName}`,
             });
           }
+        }
+
+        // Type 3: Empty space not on wypowiedzenie (except for whole addresses)
+        if (!isWholeAddress && space.status === 'vacant' && !space.tenant) {
+          conflicts.push({
+            id: generateId(),
+            type: 'no_room', // Reusing type or could add new one
+            projectId: project.id,
+            projectName: project.name,
+            addressId: address.id,
+            addressName: address.name,
+            tenantId: 'empty-' + space.id,
+            firstName: 'Miejsce',
+            lastName: 'puste',
+            spaceId: space.id,
+            message: `Miejsce niezajęte i nie postawione na Wyp. — proszę kogoś zakwaterować lub ustawić Wyp.`,
+          });
         }
       }
     }
@@ -344,7 +367,7 @@ export const addAddress = async (projectId: string, addressData: Omit<Address, '
   return newAddress;
 };
 
-export const updateAddress = async (projectId: string, addressId: string, updates: Partial<Address>): Promise<void> => {
+export const updateAddress = async (projectId: string, addressId: string, updates: Partial<Address> & { regularRooms?: number }): Promise<void> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
@@ -352,10 +375,104 @@ export const updateAddress = async (projectId: string, addressId: string, update
   const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
   if (addressIndex === -1) throw new Error('Address not found');
 
+  const address = projects[projectIndex].addresses[addressIndex];
+  const { regularRooms, coupleRooms, ...otherUpdates } = updates;
+
+  // Handle room adjustments if room counts are provided
+  if (regularRooms !== undefined || coupleRooms !== undefined) {
+    const currentRegularRooms = address.rooms.filter(r => r.type !== 'couple');
+    const currentCoupleRooms = address.rooms.filter(r => r.type === 'couple');
+
+    let updatedRooms = [...address.rooms];
+
+    // Adjust regular rooms
+    if (regularRooms !== undefined) {
+      if (regularRooms > currentRegularRooms.length) {
+        // Add missing regular rooms
+        const toAdd = regularRooms - currentRegularRooms.length;
+        for (let i = 0; i < toAdd; i++) {
+          updatedRooms.push({
+            id: generateId(),
+            addressId: address.id,
+            name: `Pokój ${currentRegularRooms.length + i + 1}`,
+            type: 'male', // Default
+            totalSpaces: 0,
+            spaces: [],
+            amenities: { shower: false, toilet: false, wifi: false, stove: false, fridge: false },
+          });
+        }
+      } else if (regularRooms < currentRegularRooms.length) {
+        // Remove extra empty regular rooms
+        let toRemove = currentRegularRooms.length - regularRooms;
+        // Iterate from the end to remove the latest rooms first
+        for (let i = updatedRooms.length - 1; i >= 0 && toRemove > 0; i--) {
+          const room = updatedRooms[i];
+          if (room.type !== 'couple') {
+            const isEmpty = room.spaces.every(s => !s.tenant);
+            if (isEmpty) {
+              updatedRooms.splice(i, 1);
+              toRemove--;
+            }
+          }
+        }
+      }
+    }
+
+    // Adjust couple rooms
+    if (coupleRooms !== undefined) {
+      if (coupleRooms > currentCoupleRooms.length) {
+        // Add missing couple rooms
+        const toAdd = coupleRooms - currentCoupleRooms.length;
+        for (let i = 0; i < toAdd; i++) {
+          const roomId = generateId();
+          const spaces: Space[] = [];
+          for (let j = 0; j < 2; j++) {
+            spaces.push({
+              id: generateId(),
+              roomId,
+              number: j + 1,
+              status: 'vacant',
+              tenant: null,
+              amenities: { shower: false, toilet: false, wifi: false, stove: false, fridge: false },
+            });
+          }
+          updatedRooms.push({
+            id: roomId,
+            addressId: address.id,
+            name: `Pokój dla par ${currentCoupleRooms.length + i + 1}`,
+            type: 'couple',
+            totalSpaces: 2,
+            spaces,
+            amenities: { shower: false, toilet: false, wifi: false, stove: false, fridge: false },
+          });
+        }
+      } else if (coupleRooms < currentCoupleRooms.length) {
+        // Remove extra empty couple rooms
+        let toRemove = currentCoupleRooms.length - coupleRooms;
+        for (let i = updatedRooms.length - 1; i >= 0 && toRemove > 0; i--) {
+          const room = updatedRooms[i];
+          if (room.type === 'couple') {
+            const isEmpty = room.spaces.every(s => !s.tenant);
+            if (isEmpty) {
+              updatedRooms.splice(i, 1);
+              toRemove--;
+            }
+          }
+        }
+      }
+    }
+
+    address.rooms = updatedRooms;
+    // Update totalSpaces and coupleRooms counts in address object
+    address.coupleRooms = updatedRooms.filter(r => r.type === 'couple').length;
+    address.totalSpaces = updatedRooms.reduce((sum, r) => sum + r.totalSpaces, 0);
+  }
+
   projects[projectIndex].addresses[addressIndex] = {
-    ...projects[projectIndex].addresses[addressIndex],
-    ...updates,
+    ...address,
+    ...otherUpdates,
   };
+  
   await saveData(projects);
 };
 

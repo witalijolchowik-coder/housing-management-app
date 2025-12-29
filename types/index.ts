@@ -99,6 +99,7 @@ export interface Address {
   rooms: Room[];
   unassignedTenants: Tenant[]; // Tenants without assigned space (temporary, waiting for room assignment)
   status?: 'active' | 'wypowiedzenie'; // Address-level status
+  isWholeAddress?: boolean; // If true, address is rented as a whole
   addressWypowiedzienieStart?: string; // When address was put on wypowiedzenie
   operator?: OperatorType; // Operator: Rent Planet, E-Port, or Other
   operatorName?: string; // Custom operator name if operator is 'other'
@@ -171,6 +172,7 @@ export interface AddAddressFormData {
   couplePrice?: number;
   operator?: OperatorType;
   operatorName?: string;
+  isWholeAddress?: boolean;
 }
 
 export interface AddProjectFormData {

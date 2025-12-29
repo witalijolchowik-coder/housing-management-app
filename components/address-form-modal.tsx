@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Modal, ScrollView, TextInput } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, Switch } from 'react-native';
 import { useState, useEffect } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
@@ -35,16 +35,18 @@ export function AddressFormModal({
     couplePrice: 0,
     operator: 'rent_planet',
     operatorName: '',
+    isWholeAddress: false,
   });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (address) {
+      const regularRoomsCount = address.rooms.filter(r => r.type !== 'couple').length;
       setFormData({
         name: address.name,
         fullAddress: address.fullAddress,
         totalSpaces: address.totalSpaces,
-        regularRooms: 0, // Not editable for existing addresses
+        regularRooms: regularRoomsCount,
         coupleRooms: address.coupleRooms,
         companyName: address.companyName,
         ownerName: address.ownerName,
@@ -55,6 +57,7 @@ export function AddressFormModal({
         couplePrice: address.couplePrice || 0,
         operator: address.operator || 'rent_planet',
         operatorName: address.operatorName || '',
+        isWholeAddress: address.isWholeAddress || false,
       });
     } else {
       setFormData({
@@ -72,6 +75,7 @@ export function AddressFormModal({
         couplePrice: 0,
         operator: 'rent_planet',
         operatorName: '',
+        isWholeAddress: false,
       });
     }
   }, [address, visible]);
@@ -148,6 +152,24 @@ export function AddressFormModal({
               placeholderTextColor={colors.muted}
               className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
               editable={!loading}
+            />
+          </View>
+
+          {/* Whole Address Toggle */}
+          <View className="mb-6 flex-row items-center justify-between bg-surface p-4 rounded-lg border border-border">
+            <View className="flex-1 mr-4">
+              <Text className="text-sm font-semibold text-foreground">
+                Adres wynajmowany w całości
+              </Text>
+              <Text className="text-xs text-muted mt-1">
+                Wyłącza powiadomienia o pustych miejscach
+              </Text>
+            </View>
+            <Switch
+              value={formData.isWholeAddress}
+              onValueChange={(value) => setFormData({ ...formData, isWholeAddress: value })}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="#fff"
             />
           </View>
 
@@ -245,30 +267,28 @@ export function AddressFormModal({
           </View>
 
           {/* Regular Rooms */}
-          {!address && (
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Zwykłe pokoje
-              </Text>
-              <TextInput
-                value={formData.regularRooms.toString()}
-                onChangeText={(text) => setFormData({ ...formData, regularRooms: parseInt(text) || 0 })}
-                placeholder="5"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                editable={!loading}
-              />
-              <Text className="text-xs text-muted mt-1">
-                Liczba pustych pokoi do utworzenia
-              </Text>
-            </View>
-          )}
+          <View className="mb-4">
+            <Text className="text-sm font-semibold text-foreground mb-2">
+              Liczba zwykłych pokoi
+            </Text>
+            <TextInput
+              value={formData.regularRooms.toString()}
+              onChangeText={(text) => setFormData({ ...formData, regularRooms: parseInt(text) || 0 })}
+              placeholder="5"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+              editable={!loading}
+            />
+            <Text className="text-xs text-muted mt-1">
+              {address ? 'Automatyczne tworzenie/usuwanie pustych pokoi' : 'Liczba pustych pokoi do utworzenia'}
+            </Text>
+          </View>
 
           {/* Couple Rooms */}
           <View className="mb-4">
             <Text className="text-sm font-semibold text-foreground mb-2">
-              Pokoje dla par
+              Liczba pokoi dla par
             </Text>
             <TextInput
               value={formData.coupleRooms.toString()}
@@ -279,11 +299,9 @@ export function AddressFormModal({
               className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
               editable={!loading}
             />
-            {!address && (
-              <Text className="text-xs text-muted mt-1">
-                Pokoje z 2 miejscami dla par
-              </Text>
-            )}
+            <Text className="text-xs text-muted mt-1">
+              {address ? 'Automatyczne tworzenie/usuwanie pustych pokoi dla par' : 'Pokoje z 2 miejscami dla par'}
+            </Text>
           </View>
 
           {/* Owner Name */}

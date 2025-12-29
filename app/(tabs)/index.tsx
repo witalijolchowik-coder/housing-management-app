@@ -82,7 +82,7 @@ export default function DashboardScreen() {
     }
 
     const occupancyPercent = totalSpaces > 0 
-      ? Math.round(((totalOccupied + totalWypowiedzenie) / totalSpaces) * 100)
+      ? Math.round((totalOccupied / totalSpaces) * 100)
       : 0;
 
     return { totalSpaces, totalOccupied, totalVacant, totalWypowiedzenie, occupancyPercent };
