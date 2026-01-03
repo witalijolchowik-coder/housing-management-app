@@ -1,9 +1,11 @@
-import { View, Text, Pressable, Modal, ScrollView, TextInput, Switch } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, Switch, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useTranslations } from '@/hooks/use-translations';
 import { Address, AddAddressFormData, OperatorType } from '@/types';
+import { applyPricesToAll } from '@/lib/store';
+import { useLocalSearchParams } from 'expo-router';
 
 interface AddressFormModalProps {
   visible: boolean;
@@ -20,6 +22,7 @@ export function AddressFormModal({
 }: AddressFormModalProps) {
   const colors = useColors();
   const t = useTranslations();
+  const { projectId } = useLocalSearchParams<{ projectId: string }>();
   const [formData, setFormData] = useState<AddAddressFormData>({
     name: '',
     fullAddress: '',
@@ -33,6 +36,7 @@ export function AddressFormModal({
     totalCost: 0,
     pricePerSpace: 0,
     couplePrice: 0,
+    mediaFee: 450,
     operator: 'rent_planet',
     operatorName: '',
     isWholeAddress: false,
@@ -55,6 +59,7 @@ export function AddressFormModal({
         totalCost: address.totalCost,
         pricePerSpace: address.pricePerSpace,
         couplePrice: address.couplePrice || 0,
+        mediaFee: address.mediaFee ?? 450,
         operator: address.operator || 'rent_planet',
         operatorName: address.operatorName || '',
         isWholeAddress: address.isWholeAddress || false,
@@ -73,6 +78,7 @@ export function AddressFormModal({
         totalCost: 0,
         pricePerSpace: 0,
         couplePrice: 0,
+        mediaFee: 450,
         operator: 'rent_planet',
         operatorName: '',
         isWholeAddress: false,
@@ -96,6 +102,36 @@ export function AddressFormModal({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApplyToAll = async () => {
+    if (!address || !projectId) return;
+
+    Alert.alert(
+      'Zastosuj do wszystkich',
+      'Czy na pewno chcesz zastosować te stawki do wszystkich mieszkańców tego adresu?',
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        {
+          text: 'Tak, zastosuj',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              // First save the address settings
+              await onSave(formData);
+              // Then apply to all tenants
+              await applyPricesToAll(projectId, address.id);
+              Alert.alert('Sukces', 'Stawki zostały zastosowane do wszystkich mieszkańców');
+            } catch (error) {
+              console.error('Error applying prices:', error);
+              Alert.alert('Błąd', 'Wystąpił błąd podczas stosowania stawek');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -351,52 +387,84 @@ export function AddressFormModal({
             />
           </View>
 
-          {/* Total Cost */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">
-              {t.forms.totalCost}
-            </Text>
-            <TextInput
-              value={formData.totalCost.toString()}
-              onChangeText={(text) => setFormData({ ...formData, totalCost: parseInt(text) || 0 })}
-              placeholder="10000"
-              placeholderTextColor={colors.muted}
-              keyboardType="number-pad"
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              editable={!loading}
-            />
-          </View>
+          {/* Pricing Section */}
+          <View className="mt-4 mb-6">
+            <Text className="text-lg font-bold text-foreground mb-4">Ceny</Text>
+            
+            {/* Media Fee */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-2">
+                Kwota za media
+              </Text>
+              <TextInput
+                value={formData.mediaFee?.toString() || '450'}
+                onChangeText={(text) => setFormData({ ...formData, mediaFee: parseInt(text) || 0 })}
+                placeholder="450"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                editable={!loading}
+              />
+            </View>
 
-          {/* Price Per Space */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">
-              {t.forms.pricePerSpace}
-            </Text>
-            <TextInput
-              value={formData.pricePerSpace.toString()}
-              onChangeText={(text) => setFormData({ ...formData, pricePerSpace: parseInt(text) || 0 })}
-              placeholder="500"
-              placeholderTextColor={colors.muted}
-              keyboardType="number-pad"
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              editable={!loading}
-            />
-          </View>
+            {/* Cena dostawcy (formerly totalCost) */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-2">
+                Cena dostawcy
+              </Text>
+              <TextInput
+                value={formData.totalCost.toString()}
+                onChangeText={(text) => setFormData({ ...formData, totalCost: parseInt(text) || 0 })}
+                placeholder="10000"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                editable={!loading}
+              />
+            </View>
 
-          {/* Couple Price */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">
-              Cena dla pary
-            </Text>
-            <TextInput
-              value={formData.couplePrice?.toString() || '0'}
-              onChangeText={(text) => setFormData({ ...formData, couplePrice: parseInt(text) || 0 })}
-              placeholder="800"
-              placeholderTextColor={colors.muted}
-              keyboardType="number-pad"
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              editable={!loading}
-            />
+            {/* Cena za mieszkanie (formerly pricePerSpace) */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-2">
+                Cena za mieszkanie
+              </Text>
+              <TextInput
+                value={formData.pricePerSpace.toString()}
+                onChangeText={(text) => setFormData({ ...formData, pricePerSpace: parseInt(text) || 0 })}
+                placeholder="500"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                editable={!loading}
+              />
+            </View>
+
+            {/* Cena za mieszkanie – Pary (formerly couplePrice) */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-2">
+                Cena za mieszkanie – Pary
+              </Text>
+              <TextInput
+                value={formData.couplePrice?.toString() || '0'}
+                onChangeText={(text) => setFormData({ ...formData, couplePrice: parseInt(text) || 0 })}
+                placeholder="800"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                editable={!loading}
+              />
+            </View>
+
+            {/* Apply to All Button */}
+            {address && (
+              <Pressable
+                onPress={handleApplyToAll}
+                disabled={loading}
+                className="bg-primary/10 border border-primary rounded-lg py-3 items-center mt-2"
+              >
+                <Text className="text-primary font-semibold">Zastosuj do wszystkich</Text>
+              </Pressable>
+            )}
           </View>
         </ScrollView>
 

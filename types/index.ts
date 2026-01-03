@@ -95,6 +95,7 @@ export interface Address {
   totalCost: number;
   pricePerSpace: number;
   couplePrice?: number; // Price for couple rooms
+  mediaFee?: number; // Media fee
   photos: string[];
   rooms: Room[];
   unassignedTenants: Tenant[]; // Tenants without assigned space (temporary, waiting for room assignment)
@@ -170,6 +171,7 @@ export interface AddAddressFormData {
   totalCost: number;
   pricePerSpace: number;
   couplePrice?: number;
+  mediaFee?: number;
   operator?: OperatorType;
   operatorName?: string;
   isWholeAddress?: boolean;

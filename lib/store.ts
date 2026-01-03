@@ -565,6 +565,10 @@ export const removeAddressFromWypowiedzenie = async (projectId: string, addressI
   await saveData(projects);
 };
 
+export const updateProjectsOrder = async (projects: Project[]): Promise<void> => {
+  await saveData(projects);
+};
+
 // CRUD operations for Rooms
 export const addRoom = async (
   projectId: string,
@@ -779,14 +783,13 @@ export const assignTenantToSpace = async (
 
   const address = projects[projectIndex].addresses[addressIndex];
   let tenant: Tenant | undefined;
-  let oldSpaceId: string | undefined;
+  let targetRoom: Room | undefined;
 
   // Find tenant and remove from old space
   for (const room of address.rooms) {
     for (const space of room.spaces) {
       if (space.tenant?.id === tenantId) {
         tenant = space.tenant;
-        oldSpaceId = space.id;
         space.tenant = undefined;
         space.status = 'vacant';
         break;
@@ -801,10 +804,47 @@ export const assignTenantToSpace = async (
   for (const room of address.rooms) {
     for (const space of room.spaces) {
       if (space.id === newSpaceId) {
+        targetRoom = room;
         tenant.spaceId = newSpaceId;
+        
+        // Calculate price based on room type
+        const mediaFee = address.mediaFee || 0;
+        if (room.type === 'couple') {
+          tenant.monthlyPrice = (address.couplePrice || 0) + mediaFee;
+        } else {
+          tenant.monthlyPrice = (address.pricePerSpace || 0) + mediaFee;
+        }
+
         space.tenant = tenant;
         space.status = 'occupied';
         break;
+      }
+    }
+  }
+
+  await saveData(projects);
+};
+
+// Apply prices to all tenants in an address
+export const applyPricesToAll = async (projectId: string, addressId: string): Promise<void> => {
+  const projects = await loadData();
+  const projectIndex = projects.findIndex((p) => p.id === projectId);
+  if (projectIndex === -1) throw new Error('Project not found');
+
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
+
+  const address = projects[projectIndex].addresses[addressIndex];
+  const mediaFee = address.mediaFee || 0;
+
+  for (const room of address.rooms) {
+    for (const space of room.spaces) {
+      if (space.tenant) {
+        if (room.type === 'couple') {
+          space.tenant.monthlyPrice = (address.couplePrice || 0) + mediaFee;
+        } else {
+          space.tenant.monthlyPrice = (address.pricePerSpace || 0) + mediaFee;
+        }
       }
     }
   }

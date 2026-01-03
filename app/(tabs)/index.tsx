@@ -13,7 +13,7 @@ import { SettingsMenuModal } from '@/components/settings-menu-modal';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Project, ProjectStats, Conflict } from '@/types';
-import { loadData, calculateProjectStats, initializeDemoData, addProject, updateProject, deleteProject, getConflicts, saveData } from '@/lib/store';
+import { loadData, calculateProjectStats, initializeDemoData, addProject, updateProject, deleteProject, getConflicts, saveData, updateProjectsOrder } from '@/lib/store';
 import { parseCSV, groupCSVByAddress, findSimilarAddresses, importCSVIntoProject, AddressGroup } from '@/lib/csv-import';
 import { AddressMatchDialog } from '@/components/address-match-dialog';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -37,6 +37,7 @@ export default function DashboardScreen() {
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
   const [addressMappings, setAddressMappings] = useState<Map<string, string>>(new Map());
   const [pendingCSVRows, setPendingCSVRows] = useState<any[]>([]);
+  const [filterProjectId, setFilterProjectId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -72,20 +73,24 @@ export default function DashboardScreen() {
     let totalOccupied = 0;
     let totalVacant = 0;
     let totalWypowiedzenie = 0;
+    let totalAddresses = 0;
+    let conflictCount = 0;
 
-    for (const project of projects) {
+    const projectsToCalculate = filterProjectId 
+      ? projects.filter(p => p.id === filterProjectId)
+      : projects;
+
+    for (const project of projectsToCalculate) {
       const stats = calculateProjectStats(project);
       totalSpaces += stats.total;
       totalOccupied += stats.occupied;
       totalVacant += stats.vacant;
       totalWypowiedzenie += stats.wypowiedzenie;
+      totalAddresses += project.addresses.length;
+      conflictCount += stats.conflictCount;
     }
 
-    const occupancyPercent = totalSpaces > 0 
-      ? Math.round((totalOccupied / totalSpaces) * 100)
-      : 0;
-
-    return { totalSpaces, totalOccupied, totalVacant, totalWypowiedzenie, occupancyPercent };
+    return { totalSpaces, totalOccupied, totalVacant, totalWypowiedzenie, totalAddresses, conflictCount };
   };
 
   const handleProjectPress = (projectId: string) => {
@@ -93,6 +98,14 @@ export default function DashboardScreen() {
       pathname: '/address-list',
       params: { projectId },
     });
+  };
+
+  const handleProjectLongPress = (projectId: string) => {
+    if (filterProjectId === projectId) {
+      setFilterProjectId(null); // Toggle off
+    } else {
+      setFilterProjectId(projectId); // Filter by this project
+    }
   };
 
   const handleProjectMenu = (project: Project) => {
@@ -177,7 +190,7 @@ export default function DashboardScreen() {
       }
     } catch (error) {
       console.error('Error importing CSV:', error);
-      Alert.alert('Błąd', 'Wystąpił błąd podczas importu pliku CSV');
+      Alert.alert('Błąd', 'Wystąpiл błąd podczas importu pliku CSV');
     }
   };
 
@@ -272,12 +285,21 @@ export default function DashboardScreen() {
     }
   };
 
+  const moveProject = async (fromIndex: number, toIndex: number) => {
+    const newProjects = [...projects];
+    const [movedProject] = newProjects.splice(fromIndex, 1);
+    newProjects.splice(toIndex, 0, movedProject);
+    setProjects(newProjects);
+    await updateProjectsOrder(newProjects);
+  };
+
   const overallStats = calculateOverallStats();
 
-  const renderProjectCard = ({ item }: { item: Project }) => {
+  const renderProjectCard = ({ item, index }: { item: Project, index: number }) => {
     const stats = calculateProjectStats(item);
     const hasEvictions = stats.wypowiedzenie > 0;
     const hasConflicts = stats.conflictCount > 0;
+    const isFiltered = filterProjectId === item.id;
 
     // Collect unique operators from all addresses
     const operators = new Set<string>();
@@ -302,64 +324,87 @@ export default function DashboardScreen() {
     };
 
     return (
-      <Pressable
-        onPress={() => handleProjectPress(item.id)}
-        style={({ pressed }) => ({
-          opacity: pressed ? 0.8 : 1,
-        })}
-      >
-        <Card className="p-5 mb-4">
-          <View className="gap-4">
-            {/* Header */}
-            <View className="flex-row justify-between items-start">
-              <View className="flex-1">
-                <Text className="text-xl font-bold text-foreground">{item.name}</Text>
-                {item.city && (
-                  <View className="flex-row flex-wrap items-center gap-2 mt-1">
-                    <Text className="text-sm text-muted">{item.city}</Text>
-                    {operatorList.length > 0 && operatorList.map((operator) => (
-                      <View
-                        key={operator}
-                        className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/50"
-                      >
-                        <MaterialIcons name="business" size={12} color={colors.muted} />
-                        <Text className="text-xs text-muted">{getOperatorLabel(operator)}</Text>
-                      </View>
-                    ))}
-                  </View>
+      <View className="flex-row items-center mb-4">
+        {/* Drag Handle Emulation for Web/Simple UI */}
+        <View className="gap-2 mr-2">
+          <Pressable 
+            onPress={() => index > 0 && moveProject(index, index - 1)}
+            disabled={index === 0}
+            className={`p-1 rounded-full ${index === 0 ? 'opacity-20' : 'bg-surfaceVariant'}`}
+          >
+            <MaterialIcons name="keyboard-arrow-up" size={20} color={colors.muted} />
+          </Pressable>
+          <Pressable 
+            onPress={() => index < projects.length - 1 && moveProject(index, index + 1)}
+            disabled={index === projects.length - 1}
+            className={`p-1 rounded-full ${index === projects.length - 1 ? 'opacity-20' : 'bg-surfaceVariant'}`}
+          >
+            <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.muted} />
+          </Pressable>
+        </View>
+
+        <Pressable
+          onPress={() => handleProjectPress(item.id)}
+          onLongPress={() => handleProjectLongPress(item.id)}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.8 : 1,
+            transform: [{ scale: isFiltered ? 1.02 : 1 }],
+            flex: 1,
+          })}
+        >
+          <Card className={`p-5 ${isFiltered ? 'border-2 border-primary' : ''}`}>
+            <View className="gap-4">
+              {/* Header */}
+              <View className="flex-row justify-between items-start">
+                <View className="flex-1">
+                  <Text className="text-xl font-bold text-foreground">{item.name}</Text>
+                  {item.city && (
+                    <View className="flex-row flex-wrap items-center gap-2 mt-1">
+                      <Text className="text-sm text-muted">{item.city}</Text>
+                      {operatorList.length > 0 && operatorList.map((operator) => (
+                        <View
+                          key={operator}
+                          className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/50"
+                        >
+                          <MaterialIcons name="business" size={12} color={colors.muted} />
+                          <Text className="text-xs text-muted">{getOperatorLabel(operator)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <Pressable
+                  onPress={() => handleProjectMenu(item)}
+                  className="bg-surfaceVariant/60 rounded-full p-2.5"
+                >
+                  <MaterialIcons name="more-vert" size={20} color={colors.muted} />
+                </Pressable>
+              </View>
+
+              {/* Occupancy */}
+              <View className="gap-2">
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-4xl font-bold text-primary">{stats.occupancyPercent}%</Text>
+                  <Text className="text-sm text-muted">
+                    {stats.occupied}/{stats.total} {t.addressList.occupied}
+                  </Text>
+                </View>
+                <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />
+              </View>
+
+              {/* Badges */}
+              <View className="flex-row flex-wrap gap-3 pt-2 border-t border-border/30">
+                {hasEvictions && (
+                  <Badge variant="warning" size="sm" label={`${stats.wypowiedzenie} ${t.roomDetails.eviction}`} />
+                )}
+                {hasConflicts && (
+                  <Badge variant="error" size="sm" label={`${stats.conflictCount} ${t.statistics.conflictCount}`} />
                 )}
               </View>
-              <Pressable
-                onPress={() => handleProjectMenu(item)}
-                className="bg-surfaceVariant/60 rounded-full p-2.5"
-              >
-                <MaterialIcons name="more-vert" size={20} color={colors.muted} />
-              </Pressable>
             </View>
-
-            {/* Occupancy */}
-            <View className="gap-2">
-              <View className="flex-row justify-between items-center">
-                <Text className="text-4xl font-bold text-primary">{stats.occupancyPercent}%</Text>
-                <Text className="text-sm text-muted">
-                  {stats.occupied}/{stats.total} {t.addressList.occupied}
-                </Text>
-              </View>
-              <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />
-            </View>
-
-            {/* Badges */}
-            <View className="flex-row flex-wrap gap-3 pt-2 border-t border-border/30">
-              {hasEvictions && (
-                <Badge variant="warning" size="sm" label={`${stats.wypowiedzenie} ${t.roomDetails.eviction}`} />
-              )}
-              {hasConflicts && (
-                <Badge variant="error" size="sm" label={`${stats.conflictCount} ${t.statistics.conflictCount}`} />
-              )}
-            </View>
-          </View>
-        </Card>
-      </Pressable>
+          </Card>
+        </Pressable>
+      </View>
     );
   };
 
@@ -367,7 +412,12 @@ export default function DashboardScreen() {
     <ScreenContainer className="p-4">
       {/* Header */}
       <View className="flex-row justify-between items-center mb-8">
-        <Text className="text-3xl font-bold text-foreground">{t.dashboard.title}</Text>
+        <View>
+          <Text className="text-3xl font-bold text-foreground">{t.dashboard.title}</Text>
+          {filterProjectId && (
+            <Text className="text-sm text-primary font-medium">Filtrowanie: {projects.find(p => p.id === filterProjectId)?.name}</Text>
+          )}
+        </View>
         <Pressable
           onPress={() => setSettingsVisible(true)}
           style={({ pressed }) => ({
@@ -384,32 +434,33 @@ export default function DashboardScreen() {
         <View className="mb-6">
           {/* 2x3 Grid Layout */}
           <View className="flex-row gap-3 mb-3">
-            {/* Occupancy */}
+            {/* Lokale */}
             <Pressable 
-              onPress={() => handleStatClick('occupancy')}
+              onPress={() => {}}
               style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
               className="flex-1"
             >
               <Card className="p-4 bg-primary items-center justify-center" style={{ minHeight: 88 }}>
-                <Text className="text-white text-xs font-medium">Obłożenie</Text>
-                <Text className="text-white text-3xl font-bold mt-1">{overallStats.occupancyPercent}%</Text>
+                <MaterialIcons name="apartment" size={24} color="white" />
+                <Text className="text-white text-xs font-medium mt-1">Lokale</Text>
+                <Text className="text-white text-2xl font-bold">{overallStats.totalAddresses}</Text>
               </Card>
             </Pressable>
 
-            {/* Total Spaces */}
+            {/* Total Spaces (Razem) */}
             <Pressable 
               onPress={() => handleStatClick('total')}
               style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
               className="flex-1"
             >
               <Card className="p-4 items-center">
-                <MaterialIcons name="apartment" size={24} color={colors.primary} />
+                <MaterialIcons name="hotel" size={24} color={colors.primary} />
                 <Text className="text-xs text-muted mt-1">Razem</Text>
                 <Text className="text-xl font-bold text-foreground">{overallStats.totalSpaces}</Text>
               </Card>
             </Pressable>
 
-            {/* Occupied */}
+            {/* Occupied (Zajęte) */}
             <Pressable 
               onPress={() => handleStatClick('occupied')}
               style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
@@ -424,7 +475,7 @@ export default function DashboardScreen() {
           </View>
 
           <View className="flex-row gap-3">
-            {/* Vacant */}
+            {/* Vacant (Wolne) */}
             <Pressable 
               onPress={() => handleStatClick('vacant')}
               style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
@@ -437,7 +488,7 @@ export default function DashboardScreen() {
               </Card>
             </Pressable>
 
-            {/* Wypowiedzenie */}
+            {/* Wypowiedzenie (Wyp.) */}
             <Pressable 
               onPress={() => handleStatClick('wypowiedzenie')}
               style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
@@ -450,7 +501,7 @@ export default function DashboardScreen() {
               </Card>
             </Pressable>
 
-            {/* Conflicts */}
+            {/* Conflicts (Konflikty) */}
             <Pressable 
               onPress={() => handleStatClick('conflicts')}
               style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
@@ -459,7 +510,7 @@ export default function DashboardScreen() {
               <Card className="p-4 items-center">
                 <MaterialIcons name="error" size={24} color={colors.error} />
                 <Text className="text-xs text-muted mt-1">Konflikty</Text>
-                <Text className="text-xl font-bold text-foreground">{conflicts.length}</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.conflictCount}</Text>
               </Card>
             </Pressable>
           </View>
@@ -477,9 +528,9 @@ export default function DashboardScreen() {
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-          {projects.map((project) => (
+          {projects.map((project, index) => (
             <View key={project.id}>
-              {renderProjectCard({ item: project })}
+              {renderProjectCard({ item: project, index })}
             </View>
           ))}
         </ScrollView>
