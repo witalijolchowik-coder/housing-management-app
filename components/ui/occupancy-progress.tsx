@@ -14,11 +14,11 @@ export function OccupancyProgress({ occupied, total, size = 'md' }: OccupancyPro
   const percentage = total > 0 ? (occupied / total) * 100 : 0;
 
   // Determine color based on occupancy
-  let barColor = colors.success; // Green - has space
-  if (percentage >= 75) {
-    barColor = colors.error; // Red - almost full
-  } else if (percentage >= 50) {
-    barColor = colors.warning; // Yellow - mostly full
+  let barColor = colors.primary; // Default blue style
+  if (percentage === 100) {
+    barColor = colors.success; // Green when full
+  } else if (percentage >= 75) {
+    barColor = colors.warning; // Yellow when almost full
   }
 
   // Size configuration

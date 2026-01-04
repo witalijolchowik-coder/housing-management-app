@@ -117,8 +117,8 @@ export function AddressFormModal({
           onPress: async () => {
             try {
               setLoading(true);
-              // First save the address settings
-              await onSave(formData);
+              // First save the address settings without closing the modal
+              await onSave(formData, false); 
               // Then apply to all tenants
               await applyPricesToAll(projectId, address.id);
               Alert.alert('Sukces', 'Stawki zostały zastosowane do wszystkich mieszkańców');
@@ -286,6 +286,22 @@ export function AddressFormModal({
             </View>
           </View>
 
+          {/* Cena dostawcy (moved here) */}
+          <View className="mb-4">
+            <Text className="text-sm font-semibold text-foreground mb-2">
+              Cena dostawcy
+            </Text>
+            <TextInput
+              value={formData.totalCost.toString()}
+              onChangeText={(text) => setFormData({ ...formData, totalCost: parseInt(text) || 0 })}
+              placeholder="10000"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+              editable={!loading}
+            />
+          </View>
+
           {/* Total Spaces */}
           <View className="mb-4">
             <Text className="text-sm font-semibold text-foreground mb-2">
@@ -389,7 +405,7 @@ export function AddressFormModal({
 
           {/* Pricing Section */}
           <View className="mt-4 mb-6">
-            <Text className="text-lg font-bold text-foreground mb-4">Ceny</Text>
+            <Text className="text-lg font-bold text-foreground mb-4">Płata za mieszkanie</Text>
             
             {/* Media Fee */}
             <View className="mb-4">
@@ -407,23 +423,7 @@ export function AddressFormModal({
               />
             </View>
 
-            {/* Cena dostawcy (formerly totalCost) */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Cena dostawcy
-              </Text>
-              <TextInput
-                value={formData.totalCost.toString()}
-                onChangeText={(text) => setFormData({ ...formData, totalCost: parseInt(text) || 0 })}
-                placeholder="10000"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                editable={!loading}
-              />
-            </View>
-
-            {/* Cena za mieszkanie (formerly pricePerSpace) */}
+            {/* Cena za mieszkanie */}
             <View className="mb-4">
               <Text className="text-sm font-semibold text-foreground mb-2">
                 Cena za mieszkanie
@@ -439,7 +439,7 @@ export function AddressFormModal({
               />
             </View>
 
-            {/* Cena za mieszkanie – Pary (formerly couplePrice) */}
+            {/* Cena za mieszkanie – Pary */}
             <View className="mb-4">
               <Text className="text-sm font-semibold text-foreground mb-2">
                 Cena za mieszkanie – Pary

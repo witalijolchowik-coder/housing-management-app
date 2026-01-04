@@ -1,6 +1,7 @@
 import { ScrollView, Text, View, FlatList, Pressable, Alert } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
@@ -101,11 +102,12 @@ export default function DashboardScreen() {
   };
 
   const handleProjectLongPress = (projectId: string) => {
-    if (filterProjectId === projectId) {
-      setFilterProjectId(null); // Toggle off
-    } else {
-      setFilterProjectId(projectId); // Filter by this project
-    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setFilterProjectId(projectId);
+  };
+
+  const handleProjectPressOut = () => {
+    setFilterProjectId(null);
   };
 
   const handleProjectMenu = (project: Project) => {
@@ -190,7 +192,7 @@ export default function DashboardScreen() {
       }
     } catch (error) {
       console.error('Error importing CSV:', error);
-      Alert.alert('Błąd', 'Wystąpiл błąd podczas importu pliku CSV');
+      Alert.alert('Błąd', 'Wystąpił błąd podczas importu pliku CSV');
     }
   };
 
@@ -214,7 +216,7 @@ export default function DashboardScreen() {
         // Reload all data to ensure consistency
         await loadProjects();
         
-        Alert.alert('Sukces', 'Dane zostały zaimportowane');
+        Alert.alert('Sukces', 'Dane zostały заimportowane');
       }
     } catch (error) {
       console.error('Error performing import:', error);
@@ -265,6 +267,9 @@ export default function DashboardScreen() {
 
   const handleStatClick = (type: string) => {
     switch (type) {
+      case 'lokale':
+        router.push('/all-addresses');
+        break;
       case 'wypowiedzenie':
         router.push('/statistics-detail-evictions');
         break;
@@ -324,87 +329,68 @@ export default function DashboardScreen() {
     };
 
     return (
-      <View className="flex-row items-center mb-4">
-        {/* Drag Handle Emulation for Web/Simple UI */}
-        <View className="gap-2 mr-2">
-          <Pressable 
-            onPress={() => index > 0 && moveProject(index, index - 1)}
-            disabled={index === 0}
-            className={`p-1 rounded-full ${index === 0 ? 'opacity-20' : 'bg-surfaceVariant'}`}
-          >
-            <MaterialIcons name="keyboard-arrow-up" size={20} color={colors.muted} />
-          </Pressable>
-          <Pressable 
-            onPress={() => index < projects.length - 1 && moveProject(index, index + 1)}
-            disabled={index === projects.length - 1}
-            className={`p-1 rounded-full ${index === projects.length - 1 ? 'opacity-20' : 'bg-surfaceVariant'}`}
-          >
-            <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.muted} />
-          </Pressable>
-        </View>
-
-        <Pressable
-          onPress={() => handleProjectPress(item.id)}
-          onLongPress={() => handleProjectLongPress(item.id)}
-          style={({ pressed }) => ({
-            opacity: pressed ? 0.8 : 1,
-            transform: [{ scale: isFiltered ? 1.02 : 1 }],
-            flex: 1,
-          })}
-        >
-          <Card className={`p-5 ${isFiltered ? 'border-2 border-primary' : ''}`}>
-            <View className="gap-4">
-              {/* Header */}
-              <View className="flex-row justify-between items-start">
-                <View className="flex-1">
-                  <Text className="text-xl font-bold text-foreground">{item.name}</Text>
-                  {item.city && (
-                    <View className="flex-row flex-wrap items-center gap-2 mt-1">
-                      <Text className="text-sm text-muted">{item.city}</Text>
-                      {operatorList.length > 0 && operatorList.map((operator) => (
-                        <View
-                          key={operator}
-                          className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/50"
-                        >
-                          <MaterialIcons name="business" size={12} color={colors.muted} />
-                          <Text className="text-xs text-muted">{getOperatorLabel(operator)}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-                <Pressable
-                  onPress={() => handleProjectMenu(item)}
-                  className="bg-surfaceVariant/60 rounded-full p-2.5"
-                >
-                  <MaterialIcons name="more-vert" size={20} color={colors.muted} />
-                </Pressable>
-              </View>
-
-              {/* Occupancy */}
-              <View className="gap-2">
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-4xl font-bold text-primary">{stats.occupancyPercent}%</Text>
-                  <Text className="text-sm text-muted">
-                    {stats.occupied}/{stats.total} {t.addressList.occupied}
-                  </Text>
-                </View>
-                <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />
-              </View>
-
-              {/* Badges */}
-              <View className="flex-row flex-wrap gap-3 pt-2 border-t border-border/30">
-                {hasEvictions && (
-                  <Badge variant="warning" size="sm" label={`${stats.wypowiedzenie} ${t.roomDetails.eviction}`} />
-                )}
-                {hasConflicts && (
-                  <Badge variant="error" size="sm" label={`${stats.conflictCount} ${t.statistics.conflictCount}`} />
+      <Pressable
+        onPress={() => handleProjectPress(item.id)}
+        onLongPress={() => handleProjectLongPress(item.id)}
+        onPressOut={handleProjectPressOut}
+        style={({ pressed }) => ({
+          opacity: pressed ? 0.8 : 1,
+          transform: [{ scale: isFiltered ? 1.02 : 1 }],
+          marginBottom: 16,
+        })}
+      >
+        <Card className="p-5">
+          <View className="gap-4">
+            {/* Header */}
+            <View className="flex-row justify-between items-start">
+              <View className="flex-1">
+                <Text className="text-xl font-bold text-foreground">{item.name}</Text>
+                {item.city && (
+                  <View className="flex-row flex-wrap items-center gap-2 mt-1">
+                    <Text className="text-sm text-muted">{item.city}</Text>
+                    {operatorList.length > 0 && operatorList.map((operator) => (
+                      <View
+                        key={operator}
+                        className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/50"
+                      >
+                        <MaterialIcons name="business" size={12} color={colors.muted} />
+                        <Text className="text-xs text-muted">{getOperatorLabel(operator)}</Text>
+                      </View>
+                    ))}
+                  </View>
                 )}
               </View>
+              <Pressable
+                onPress={() => handleProjectMenu(item)}
+                className="bg-surfaceVariant/60 rounded-full p-2.5"
+              >
+                <MaterialIcons name="more-vert" size={20} color={colors.muted} />
+              </Pressable>
             </View>
-          </Card>
-        </Pressable>
-      </View>
+
+            {/* Occupancy */}
+            <View className="gap-2">
+              <View className="flex-row justify-between items-center">
+                <Text className="text-4xl font-bold text-primary">{stats.occupancyPercent}%</Text>
+                <Text className="text-sm text-muted">
+                  {stats.occupied}/{stats.total} {t.addressList.occupied}
+                </Text>
+              </View>
+              <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />
+            </View>
+
+            {/* Badges */}
+            <View className="flex-row flex-wrap gap-3 pt-2 border-t border-border/30">
+              {hasEvictions && (
+                <Badge variant="warning" size="sm" label={`${stats.wypowiedzenie} ${t.roomDetails.eviction}`} />
+              )}
+              {hasConflicts && (
+                <Badge variant="error" size="sm" label={`${stats.conflictCount} ${t.statistics.conflictCount}`} />
+              )}
+            </View>
+          </View>
+        </Card>
+      </Pressable>
     );
   };
 
@@ -436,14 +422,14 @@ export default function DashboardScreen() {
           <View className="flex-row gap-3 mb-3">
             {/* Lokale */}
             <Pressable 
-              onPress={() => {}}
+              onPress={() => handleStatClick('lokale')}
               style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
               className="flex-1"
             >
-              <Card className="p-4 bg-primary items-center justify-center" style={{ minHeight: 88 }}>
-                <MaterialIcons name="apartment" size={24} color="white" />
-                <Text className="text-white text-xs font-medium mt-1">Lokale</Text>
-                <Text className="text-white text-2xl font-bold">{overallStats.totalAddresses}</Text>
+              <Card className="p-4 items-center">
+                <MaterialIcons name="apartment" size={24} color={colors.primary} />
+                <Text className="text-xs text-muted mt-1">Lokale</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.totalAddresses}</Text>
               </Card>
             </Pressable>
 
@@ -460,7 +446,7 @@ export default function DashboardScreen() {
               </Card>
             </Pressable>
 
-            {/* Occupied (Zajęte) */}
+            {/* Occupied (Zajęте) */}
             <Pressable 
               onPress={() => handleStatClick('occupied')}
               style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}

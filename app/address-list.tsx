@@ -215,15 +215,24 @@ export default function AddressListScreen() {
               <View className="flex-1 justify-between">
                 <View>
                   {/* Name and Operator Tag in one row */}
-                  <View className="flex-row items-center gap-2 flex-wrap">
-                    <Text className="text-lg font-bold text-foreground">{item.name}</Text>
-                    {item.operator && (
-                      <Badge variant="info" size="sm" label={getOperatorName()} />
-                    )}
+                  <View className="flex-row items-start justify-between">
+                    <View className="flex-1 mr-2">
+                      <View className="flex-row items-center gap-2 flex-wrap">
+                        <Text className="text-lg font-bold text-foreground">{item.name}</Text>
+                        {item.operator && (
+                          <Badge variant="info" size="sm" label={getOperatorName()} />
+                        )}
+                      </View>
+                      {/* Full Address on next row */}
+                      <Text className="text-sm text-muted mt-1">{item.fullAddress}</Text>
+                    </View>
+                    <Pressable
+                      onPress={() => handleAddressMenu(item)}
+                      className="bg-surfaceVariant/60 rounded-full p-2"
+                    >
+                      <MaterialIcons name="more-vert" size={20} color={colors.muted} />
+                    </Pressable>
                   </View>
-                  
-                  {/* Full Address on next row */}
-                  <Text className="text-sm text-muted mt-1">{item.fullAddress}</Text>
                 </View>
                 
                 <View className="flex-col gap-2">
@@ -294,12 +303,6 @@ export default function AddressListScreen() {
               {hasEvictions && (
                 <Badge variant="warning" size="sm" label={`${stats.wypowiedzenie} ${t.roomDetails.eviction}`} />
               )}
-              <Pressable
-                onPress={() => handleAddressMenu(item)}
-                className="ml-auto bg-surfaceVariant/60 rounded-full p-2.5"
-              >
-                <MaterialIcons name="more-vert" size={20} color={colors.muted} />
-              </Pressable>
             </View>
           </View>
         </Card>
