@@ -430,7 +430,11 @@ export default function SearchScreen() {
         
         {/* Archive Search Checkbox */}
         <Pressable
-          onPress={() => setSearchInArchive(!searchInArchive)}
+          onPress={() => {
+            const newValue = !searchInArchive;
+            setSearchInArchive(newValue);
+            handleSearch(searchQuery, newValue);
+          }}
           className="flex-row items-center gap-2"
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
         >
@@ -441,7 +445,7 @@ export default function SearchScreen() {
               <MaterialIcons name="check" size={16} color="white" />
             )}
           </View>
-          <Text className="text-sm text-foreground">Szukaj w archiwum</Text>
+          <Text className="text-sm text-foreground">Szukaj в archiwum</Text>
         </Pressable>
       </View>
 

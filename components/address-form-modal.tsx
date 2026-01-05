@@ -117,11 +117,9 @@ export function AddressFormModal({
           onPress: async () => {
             try {
               setLoading(true);
-              // First save the address settings without closing the modal
-              await onSave(formData, false); 
-              // Then apply to all tenants
-              await applyPricesToAll(projectId, address.id);
-              Alert.alert('Sukces', 'Stawki zostały zastosowane do wszystkich mieszkańców');
+              // Apply to all tenants directly using current formData
+              await applyPricesToAll(projectId, address.id, formData);
+              Alert.alert('Sukces', 'Stawki zostały zastosowane do всех mieszkańców');
             } catch (error) {
               console.error('Error applying prices:', error);
               Alert.alert('Błąd', 'Wystąpił błąd podczas stosowania stawek');

@@ -826,7 +826,7 @@ export const assignTenantToSpace = async (
 };
 
 // Apply prices to all tenants in an address
-export const applyPricesToAll = async (projectId: string, addressId: string): Promise<void> => {
+export const applyPricesToAll = async (projectId: string, addressId: string, currentFormData?: any): Promise<void> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
@@ -835,18 +835,33 @@ export const applyPricesToAll = async (projectId: string, addressId: string): Pr
   if (addressIndex === -1) throw new Error('Address not found');
 
   const address = projects[projectIndex].addresses[addressIndex];
-  const mediaFee = address.mediaFee || 0;
+  
+  // Use current form data if provided, otherwise use saved address data
+  const mediaFee = currentFormData ? Number(currentFormData.mediaFee) : (address.mediaFee || 0);
+  const pricePerSpace = currentFormData ? Number(currentFormData.pricePerSpace) : (address.pricePerSpace || 0);
+  const couplePrice = currentFormData ? Number(currentFormData.couplePrice) : (address.couplePrice || 0);
 
   for (const room of address.rooms) {
     for (const space of room.spaces) {
       if (space.tenant) {
         if (room.type === 'couple') {
-          space.tenant.monthlyPrice = (address.couplePrice || 0) + mediaFee;
+          space.tenant.monthlyPrice = couplePrice + mediaFee;
         } else {
-          space.tenant.monthlyPrice = (address.pricePerSpace || 0) + mediaFee;
+          space.tenant.monthlyPrice = pricePerSpace + mediaFee;
         }
       }
     }
+  }
+
+  // Also update the address itself if form data is provided
+  if (currentFormData) {
+    projects[projectIndex].addresses[addressIndex] = {
+      ...address,
+      ...currentFormData,
+      mediaFee,
+      pricePerSpace,
+      couplePrice
+    };
   }
 
   await saveData(projects);

@@ -2,6 +2,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useEffect, useState } from 'react';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useTranslations } from '@/hooks/use-translations';
@@ -31,19 +32,29 @@ export default function AllAddressesScreen() {
       const projects = await loadData();
       const all: AddressWithProject[] = [];
       
-      projects.forEach(project => {
-        project.addresses.forEach(address => {
-          all.push({
-            ...address,
-            projectName: project.name,
-            projectId: project.id
-          });
+      if (projects && Array.isArray(projects)) {
+        projects.forEach(project => {
+          if (project.addresses && Array.isArray(project.addresses)) {
+            project.addresses.forEach(address => {
+              all.push({
+                ...address,
+                projectName: project.name || 'Bez nazwy',
+                projectId: project.id
+              });
+            });
+          }
         });
-      });
+      }
 
       // Group by city
       const grouped = all.reduce((acc, addr) => {
-        const city = addr.fullAddress.split(',')[0].trim() || 'Inne';
+        let city = 'Inne';
+        if (addr.fullAddress) {
+          const parts = addr.fullAddress.split(',');
+          if (parts.length > 0) {
+            city = parts[0].trim() || 'Inne';
+          }
+        }
         if (!acc[city]) acc[city] = [];
         acc[city].push(addr);
         return acc;
@@ -62,22 +73,24 @@ export default function AllAddressesScreen() {
     let females = 0;
     let couples = 0;
 
-    address.rooms.forEach(room => {
-      room.spaces.forEach(space => {
-        if (space.tenant) {
-          if (room.type === 'couple') {
-            couples++;
-          } else if (space.tenant.gender === 'male') {
-            males++;
-          } else if (space.tenant.gender === 'female') {
-            females++;
-          }
+    if (address.rooms && Array.isArray(address.rooms)) {
+      address.rooms.forEach(room => {
+        if (room.spaces && Array.isArray(room.spaces)) {
+          room.spaces.forEach(space => {
+            if (space.tenant) {
+              if (room.type === 'couple') {
+                couples++;
+              } else if (space.tenant.gender === 'male') {
+                males++;
+              } else if (space.tenant.gender === 'female') {
+                females++;
+              }
+            }
+          });
         }
       });
-    });
+    }
 
-    // Couples are counted as pairs, so divide by 2 for number of pairs if needed, 
-    // but usually "miejsca dla par" means 2 people.
     return { males, females, couples: Math.floor(couples / 2) };
   };
 

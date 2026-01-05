@@ -1,8 +1,8 @@
-import { ScrollView, Text, View, FlatList, Pressable, Alert } from 'react-native';
+import { Text, View, Pressable, Alert } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,13 +13,14 @@ import { ProjectFormModal } from '@/components/project-form-modal';
 import { SettingsMenuModal } from '@/components/settings-menu-modal';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Project, ProjectStats, Conflict } from '@/types';
+import { Project, Conflict } from '@/types';
 import { loadData, calculateProjectStats, initializeDemoData, addProject, updateProject, deleteProject, getConflicts, saveData, updateProjectsOrder } from '@/lib/store';
 import { parseCSV, groupCSVByAddress, findSimilarAddresses, importCSVIntoProject, AddressGroup } from '@/lib/csv-import';
 import { AddressMatchDialog } from '@/components/address-match-dialog';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export default function DashboardScreen() {
   const t = useTranslations();
@@ -56,7 +57,6 @@ export default function DashboardScreen() {
       }
       setProjects(data);
       
-      // Collect all conflicts
       const allConflicts: Conflict[] = [];
       for (const project of data) {
         allConflicts.push(...getConflicts(project));
@@ -99,15 +99,6 @@ export default function DashboardScreen() {
       pathname: '/address-list',
       params: { projectId },
     });
-  };
-
-  const handleProjectLongPress = (projectId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setFilterProjectId(projectId);
-  };
-
-  const handleProjectPressOut = () => {
-    setFilterProjectId(null);
   };
 
   const handleProjectMenu = (project: Project) => {
@@ -163,11 +154,10 @@ export default function DashboardScreen() {
       
       const rows = parseCSV(csvText);
       if (rows.length === 0) {
-        Alert.alert('Błąd', 'Nie udało się odczytać danych z pliku CSV');
+        Alert.alert('Błąd', 'Nie удалось отчитать данные из файла CSV');
         return;
       }
 
-      // Group by address and check for conflicts
       const groups = groupCSVByAddress(rows);
       const groupsWithConflicts: AddressGroup[] = [];
       const mappings = new Map<string, string>();
@@ -180,19 +170,17 @@ export default function DashboardScreen() {
       }
 
       if (groupsWithConflicts.length > 0) {
-        // Show dialog for first conflict
-        setPendingCSVRows(rows); // Store rows for later import
+        setPendingCSVRows(rows);
         setPendingCSVGroups(groupsWithConflicts);
         setCurrentGroupIndex(0);
         setAddressMappings(mappings);
         setCSVImportDialogVisible(true);
       } else {
-        // No conflicts, import directly
         await performImport(selectedProject, rows, mappings);
       }
     } catch (error) {
       console.error('Error importing CSV:', error);
-      Alert.alert('Błąd', 'Wystąpił błąd podczas importu pliku CSV');
+      Alert.alert('Błąd', 'Wystąpiл ошибка во время импорта файла CSV');
     }
   };
 
@@ -203,43 +191,33 @@ export default function DashboardScreen() {
   ) => {
     try {
       const updatedProject = importCSVIntoProject(project, rows, mappings);
-      
-      const projects = await loadData();
-      const index = projects.findIndex(p => p.id === project.id);
+      const projectsData = await loadData();
+      const index = projectsData.findIndex(p => p.id === project.id);
       if (index !== -1) {
-        projects[index] = updatedProject;
-        await saveData(projects);
-        
-        // Update local state immediately
-        setProjects([...projects]);
-        
-        // Reload all data to ensure consistency
+        projectsData[index] = updatedProject;
+        await saveData(projectsData);
+        setProjects([...projectsData]);
         await loadProjects();
-        
         Alert.alert('Sukces', 'Dane zostały заimportowane');
       }
     } catch (error) {
       console.error('Error performing import:', error);
-      Alert.alert('Błąd', 'Wystąpił błąd podczas importu');
+      Alert.alert('Błąd', 'Wystąpiл ошибка во время импорта');
     }
   };
 
   const handleAddressMatch = async (addressId: string) => {
     if (!selectedProject) return;
-    
     const currentGroup = pendingCSVGroups[currentGroupIndex];
     const newMappings = new Map(addressMappings);
     newMappings.set(currentGroup.fullAddress, addressId);
     setAddressMappings(newMappings);
 
-    // Move to next conflict or finish
     if (currentGroupIndex < pendingCSVGroups.length - 1) {
       setCurrentGroupIndex(currentGroupIndex + 1);
     } else {
-      // All conflicts resolved, perform import
       setCSVImportDialogVisible(false);
       await performImport(selectedProject, pendingCSVRows, newMappings);
-      // Reset state
       setPendingCSVRows([]);
       setPendingCSVGroups([]);
       setCurrentGroupIndex(0);
@@ -249,15 +227,11 @@ export default function DashboardScreen() {
 
   const handleCreateNewAddress = async () => {
     if (!selectedProject) return;
-    
-    // Don't add mapping, let it create new address
     if (currentGroupIndex < pendingCSVGroups.length - 1) {
       setCurrentGroupIndex(currentGroupIndex + 1);
     } else {
-      // All conflicts resolved, perform import
       setCSVImportDialogVisible(false);
       await performImport(selectedProject, pendingCSVRows, addressMappings);
-      // Reset state
       setPendingCSVRows([]);
       setPendingCSVGroups([]);
       setCurrentGroupIndex(0);
@@ -290,286 +264,216 @@ export default function DashboardScreen() {
     }
   };
 
-  const moveProject = async (fromIndex: number, toIndex: number) => {
-    const newProjects = [...projects];
-    const [movedProject] = newProjects.splice(fromIndex, 1);
-    newProjects.splice(toIndex, 0, movedProject);
-    setProjects(newProjects);
-    await updateProjectsOrder(newProjects);
+  const onDragEnd = async ({ data }: { data: Project[] }) => {
+    setProjects(data);
+    await updateProjectsOrder(data);
   };
 
   const overallStats = calculateOverallStats();
 
-  const renderProjectCard = ({ item, index }: { item: Project, index: number }) => {
+  const renderProjectCard = ({ item, drag, isActive }: RenderItemParams<Project>) => {
     const stats = calculateProjectStats(item);
     const hasEvictions = stats.wypowiedzenie > 0;
     const hasConflicts = stats.conflictCount > 0;
-    const isFiltered = filterProjectId === item.id;
 
-    // Collect unique operators from all addresses
     const operators = new Set<string>();
     item.addresses.forEach(address => {
-      if (address.operator) {
-        operators.add(address.operator);
-      }
+      if (address.operator) operators.add(address.operator);
     });
     const operatorList = Array.from(operators);
 
     const getOperatorLabel = (operator: string) => {
       switch (operator) {
-        case 'rent_planet':
-          return 'Rent Planet';
-        case 'e_port':
-          return 'E-Port';
-        case 'other':
-          return 'Inne';
-        default:
-          return operator;
+        case 'rent_planet': return 'Rent Planet';
+        case 'e_port': return 'E-Port';
+        case 'other': return 'Inne';
+        default: return operator;
       }
     };
 
     return (
-      <Pressable
-        onPress={() => handleProjectPress(item.id)}
-        onLongPress={() => handleProjectLongPress(item.id)}
-        onPressOut={handleProjectPressOut}
-        style={({ pressed }) => ({
-          opacity: pressed ? 0.8 : 1,
-          transform: [{ scale: isFiltered ? 1.02 : 1 }],
-          marginBottom: 16,
-        })}
-      >
-        <Card className="p-5">
-          <View className="gap-4">
-            {/* Header */}
-            <View className="flex-row justify-between items-start">
-              <View className="flex-1">
-                <Text className="text-xl font-bold text-foreground">{item.name}</Text>
-                {item.city && (
-                  <View className="flex-row flex-wrap items-center gap-2 mt-1">
-                    <Text className="text-sm text-muted">{item.city}</Text>
-                    {operatorList.length > 0 && operatorList.map((operator) => (
-                      <View
-                        key={operator}
-                        className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/50"
-                      >
-                        <MaterialIcons name="business" size={12} color={colors.muted} />
-                        <Text className="text-xs text-muted">{getOperatorLabel(operator)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
+      <ScaleDecorator>
+        <Pressable
+          onPress={() => handleProjectPress(item.id)}
+          onLongPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setFilterProjectId(item.id);
+            drag();
+          }}
+          onPressOut={() => {
+            setFilterProjectId(null);
+          }}
+          delayLongPress={200}
+          style={{ marginBottom: 16 }}
+        >
+          <Card className={`p-5 ${isActive ? 'opacity-70' : ''}`}>
+            <View className="gap-4">
+              <View className="flex-row justify-between items-start">
+                <View className="flex-1">
+                  <Text className="text-xl font-bold text-foreground">{item.name}</Text>
+                  {item.city && (
+                    <View className="flex-row flex-wrap items-center gap-2 mt-1">
+                      <Text className="text-sm text-muted">{item.city}</Text>
+                      {operatorList.length > 0 && operatorList.map((operator) => (
+                        <View key={operator} className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/50">
+                          <MaterialIcons name="business" size={12} color={colors.muted} />
+                          <Text className="text-xs text-muted">{getOperatorLabel(operator)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <Pressable onPress={() => handleProjectMenu(item)} className="bg-surfaceVariant/60 rounded-full p-2.5">
+                  <MaterialIcons name="more-vert" size={20} color={colors.muted} />
+                </Pressable>
               </View>
-              <Pressable
-                onPress={() => handleProjectMenu(item)}
-                className="bg-surfaceVariant/60 rounded-full p-2.5"
-              >
-                <MaterialIcons name="more-vert" size={20} color={colors.muted} />
-              </Pressable>
-            </View>
 
-            {/* Occupancy */}
-            <View className="gap-2">
-              <View className="flex-row justify-between items-center">
-                <Text className="text-4xl font-bold text-primary">{stats.occupancyPercent}%</Text>
-                <Text className="text-sm text-muted">
-                  {stats.occupied}/{stats.total} {t.addressList.occupied}
-                </Text>
+              <View className="gap-2">
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-4xl font-bold text-primary">{stats.occupancyPercent}%</Text>
+                  <Text className="text-sm text-muted">
+                    {stats.occupied}/{stats.total} {t.addressList.occupied}
+                  </Text>
+                </View>
+                <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />
               </View>
-              <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />
-            </View>
 
-            {/* Badges */}
-            <View className="flex-row flex-wrap gap-3 pt-2 border-t border-border/30">
-              {hasEvictions && (
-                <Badge variant="warning" size="sm" label={`${stats.wypowiedzenie} ${t.roomDetails.eviction}`} />
-              )}
-              {hasConflicts && (
-                <Badge variant="error" size="sm" label={`${stats.conflictCount} ${t.statistics.conflictCount}`} />
-              )}
+              <View className="flex-row flex-wrap gap-3 pt-2 border-t border-border/30">
+                {hasEvictions && <Badge variant="warning" size="sm" label={`${stats.wypowiedzenie} ${t.roomDetails.eviction}`} />}
+                {hasConflicts && <Badge variant="error" size="sm" label={`${stats.conflictCount} ${t.statistics.conflictCount}`} />}
+              </View>
             </View>
-          </View>
-        </Card>
-      </Pressable>
+          </Card>
+        </Pressable>
+      </ScaleDecorator>
     );
   };
 
   return (
-    <ScreenContainer className="p-4">
-      {/* Header */}
-      <View className="flex-row justify-between items-center mb-8">
-        <View>
-          <Text className="text-3xl font-bold text-foreground">{t.dashboard.title}</Text>
-          {filterProjectId && (
-            <Text className="text-sm text-primary font-medium">Filtrowanie: {projects.find(p => p.id === filterProjectId)?.name}</Text>
-          )}
-        </View>
-        <Pressable
-          onPress={() => setSettingsVisible(true)}
-          style={({ pressed }) => ({
-            opacity: pressed ? 0.7 : 1,
-          })}
-          className="bg-surfaceVariant rounded-full p-2"
-        >
-          <MaterialIcons name="more-vert" size={24} color={colors.muted} />
-        </Pressable>
-      </View>
-
-      {/* Dashboard Statistics - Compact Grid */}
-      {!loading && projects.length > 0 && (
-        <View className="mb-6">
-          {/* 2x3 Grid Layout */}
-          <View className="flex-row gap-3 mb-3">
-            {/* Lokale */}
-            <Pressable 
-              onPress={() => handleStatClick('lokale')}
-              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-              className="flex-1"
-            >
-              <Card className="p-4 items-center">
-                <MaterialIcons name="apartment" size={24} color={colors.primary} />
-                <Text className="text-xs text-muted mt-1">Lokale</Text>
-                <Text className="text-xl font-bold text-foreground">{overallStats.totalAddresses}</Text>
-              </Card>
-            </Pressable>
-
-            {/* Total Spaces (Razem) */}
-            <Pressable 
-              onPress={() => handleStatClick('total')}
-              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-              className="flex-1"
-            >
-              <Card className="p-4 items-center">
-                <MaterialIcons name="hotel" size={24} color={colors.primary} />
-                <Text className="text-xs text-muted mt-1">Razem</Text>
-                <Text className="text-xl font-bold text-foreground">{overallStats.totalSpaces}</Text>
-              </Card>
-            </Pressable>
-
-            {/* Occupied (Zajęте) */}
-            <Pressable 
-              onPress={() => handleStatClick('occupied')}
-              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-              className="flex-1"
-            >
-              <Card className="p-4 items-center">
-                <MaterialIcons name="person" size={24} color={colors.success} />
-                <Text className="text-xs text-muted mt-1">Zajęte</Text>
-                <Text className="text-xl font-bold text-foreground">{overallStats.totalOccupied}</Text>
-              </Card>
-            </Pressable>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ScreenContainer className="p-4">
+        <View className="flex-row justify-between items-center mb-8">
+          <View>
+            <Text className="text-3xl font-bold text-foreground">{t.dashboard.title}</Text>
+            {filterProjectId && (
+              <Text className="text-sm text-primary font-medium">Filtrowanie: {projects.find(p => p.id === filterProjectId)?.name}</Text>
+            )}
           </View>
-
-          <View className="flex-row gap-3">
-            {/* Vacant (Wolne) */}
-            <Pressable 
-              onPress={() => handleStatClick('vacant')}
-              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-              className="flex-1"
-            >
-              <Card className="p-4 items-center">
-                <MaterialIcons name="event-available" size={24} color={colors.warning} />
-                <Text className="text-xs text-muted mt-1">Wolne</Text>
-                <Text className="text-xl font-bold text-foreground">{overallStats.totalVacant}</Text>
-              </Card>
-            </Pressable>
-
-            {/* Wypowiedzenie (Wyp.) */}
-            <Pressable 
-              onPress={() => handleStatClick('wypowiedzenie')}
-              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-              className="flex-1"
-            >
-              <Card className="p-4 items-center">
-                <MaterialIcons name="warning" size={24} color={colors.warning} />
-                <Text className="text-xs text-muted mt-1">Wyp.</Text>
-                <Text className="text-xl font-bold text-foreground">{overallStats.totalWypowiedzenie}</Text>
-              </Card>
-            </Pressable>
-
-            {/* Conflicts (Konflikty) */}
-            <Pressable 
-              onPress={() => handleStatClick('conflicts')}
-              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-              className="flex-1"
-            >
-              <Card className="p-4 items-center">
-                <MaterialIcons name="error" size={24} color={colors.error} />
-                <Text className="text-xs text-muted mt-1">Konflikty</Text>
-                <Text className="text-xl font-bold text-foreground">{overallStats.conflictCount}</Text>
-              </Card>
-            </Pressable>
-          </View>
+          <Pressable onPress={() => setSettingsVisible(true)} className="bg-surfaceVariant rounded-full p-2">
+            <MaterialIcons name="more-vert" size={24} color={colors.muted} />
+          </Pressable>
         </View>
-      )}
 
-      {/* Projects List */}
-      {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-muted">{t.common.loading}</Text>
-        </View>
-      ) : projects.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-muted">{t.messages.emptyProject}</Text>
-        </View>
-      ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-          {projects.map((project, index) => (
-            <View key={project.id}>
-              {renderProjectCard({ item: project, index })}
+        {!loading && projects.length > 0 && (
+          <View className="mb-6">
+            <View className="flex-row gap-3 mb-3">
+              <Pressable onPress={() => handleStatClick('lokale')} className="flex-1">
+                <Card className="p-4 items-center">
+                  <MaterialIcons name="apartment" size={24} color={colors.primary} />
+                  <Text className="text-xs text-muted mt-1">Lokali</Text>
+                  <Text className="text-xl font-bold text-foreground">{overallStats.totalAddresses}</Text>
+                </Card>
+              </Pressable>
+
+              <Pressable onPress={() => handleStatClick('total')} className="flex-1">
+                <Card className="p-4 items-center">
+                  <MaterialIcons name="hotel" size={24} color={colors.primary} />
+                  <Text className="text-xs text-muted mt-1">Miejsca</Text>
+                  <Text className="text-xl font-bold text-foreground">{overallStats.totalSpaces}</Text>
+                </Card>
+              </Pressable>
+
+              <Pressable onPress={() => handleStatClick('occupied')} className="flex-1">
+                <Card className="p-4 items-center">
+                  <MaterialIcons name="person" size={24} color={colors.success} />
+                  <Text className="text-xs text-muted mt-1">Zajęte</Text>
+                  <Text className="text-xl font-bold text-foreground">{overallStats.totalOccupied}</Text>
+                </Card>
+              </Pressable>
             </View>
-          ))}
-        </ScrollView>
-      )}
 
-      {/* FAB */}
-      <FAB 
-        icon="add" 
-        onPress={() => {
-          setEditingProject(undefined);
-          setFormVisible(true);
-        }} 
-      />
+            <View className="flex-row gap-3">
+              <Pressable onPress={() => handleStatClick('vacant')} className="flex-1">
+                <Card className="p-4 items-center">
+                  <MaterialIcons name="event-available" size={24} color={colors.warning} />
+                  <Text className="text-xs text-muted mt-1">Wolne</Text>
+                  <Text className="text-xl font-bold text-foreground">{overallStats.totalVacant}</Text>
+                </Card>
+              </Pressable>
 
-      {/* Modals */}
-      <ProjectMenuModal
-        visible={menuVisible}
-        projectName={selectedProject?.name || ''}
-        onClose={() => setMenuVisible(false)}
-        onEdit={handleEditProject}
-        onDelete={handleDeleteProject}
-        onImportCSV={handleImportCSV}
-      />
+              <Pressable onPress={() => handleStatClick('wypowiedzenie')} className="flex-1">
+                <Card className="p-4 items-center">
+                  <MaterialIcons name="warning" size={24} color={colors.warning} />
+                  <Text className="text-xs text-muted mt-1">Wyp.</Text>
+                  <Text className="text-xl font-bold text-foreground">{overallStats.totalWypowiedzenie}</Text>
+                </Card>
+              </Pressable>
 
-      <AddressMatchDialog
-        visible={csvImportDialogVisible}
-        csvAddress={pendingCSVGroups[currentGroupIndex]?.fullAddress || ''}
-        csvAddressName={pendingCSVGroups[currentGroupIndex]?.addressName || ''}
-        tenantCount={pendingCSVGroups[currentGroupIndex]?.tenantCount || 0}
-        similarAddresses={selectedProject ? findSimilarAddresses(
-          pendingCSVGroups[currentGroupIndex]?.fullAddress || '',
-          selectedProject.addresses
-        ) : []}
-        onSelectExisting={handleAddressMatch}
-        onCreateNew={handleCreateNewAddress}
-        onClose={() => setCSVImportDialogVisible(false)}
-      />
+              <Pressable onPress={() => handleStatClick('conflicts')} className="flex-1">
+                <Card className="p-4 items-center">
+                  <MaterialIcons name="error" size={24} color={colors.error} />
+                  <Text className="text-xs text-muted mt-1">Konflikty</Text>
+                  <Text className="text-xl font-bold text-foreground">{overallStats.conflictCount}</Text>
+                </Card>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
-      <ProjectFormModal
-        visible={formVisible}
-        project={editingProject}
-        onClose={() => {
-          setFormVisible(false);
-          setEditingProject(undefined);
-        }}
-        onSave={handleSaveProject}
-      />
+        {loading ? (
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-muted">{t.common.loading}</Text>
+          </View>
+        ) : projects.length === 0 ? (
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-muted">{t.messages.emptyProject}</Text>
+          </Text>
+        ) : (
+          <DraggableFlatList
+            data={projects}
+            onDragEnd={onDragEnd}
+            keyExtractor={(item) => item.id}
+            renderItem={renderProjectCard}
+            contentContainerStyle={{ paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
 
-      <SettingsMenuModal
-        visible={settingsVisible}
-        onClose={() => setSettingsVisible(false)}
-        onDataChanged={loadProjects}
-      />
-    </ScreenContainer>
+        <FAB icon="add" onPress={() => { setEditingProject(undefined); setFormVisible(true); }} />
+
+        <ProjectMenuModal
+          visible={menuVisible}
+          projectName={selectedProject?.name || ''}
+          onClose={() => setMenuVisible(false)}
+          onEdit={handleEditProject}
+          onDelete={handleDeleteProject}
+          onImportCSV={handleImportCSV}
+        />
+
+        <AddressMatchDialog
+          visible={csvImportDialogVisible}
+          csvAddress={pendingCSVGroups[currentGroupIndex]?.fullAddress || ''}
+          csvAddressName={pendingCSVGroups[currentGroupIndex]?.addressName || ''}
+          tenantCount={pendingCSVGroups[currentGroupIndex]?.tenantCount || 0}
+          similarAddresses={selectedProject ? findSimilarAddresses(pendingCSVGroups[currentGroupIndex]?.fullAddress || '', selectedProject.addresses) : []}
+          onSelectExisting={handleAddressMatch}
+          onCreateNew={handleCreateNewAddress}
+          onClose={() => setCSVImportDialogVisible(false)}
+        />
+
+        <ProjectFormModal
+          visible={formVisible}
+          project={editingProject}
+          onClose={() => { setFormVisible(false); setEditingProject(undefined); }}
+          onSave={handleSaveProject}
+        />
+
+        <SettingsMenuModal
+          visible={settingsVisible}
+          onClose={() => setSettingsVisible(false)}
+          onDataChanged={loadProjects}
+        />
+      </ScreenContainer>
+    </GestureHandlerRootView>
   );
 }
