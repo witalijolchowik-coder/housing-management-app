@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { View, Text, TextInput, ScrollView, Pressable, Alert } from 'react-native';
+import { View, Text, TextInput, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -32,7 +32,7 @@ export default function AddTenantScreen() {
   const [birthYear, setBirthYear] = useState(1995); // Default to 1995 as requested
   const [checkInDate, setCheckInDate] = useState('');
   const [workStartDate, setWorkStartDate] = useState('');
-  const [monthlyPrice, setMonthlyPrice] = useState('');
+  const [monthlyPrice, setMonthlyPrice] = useState('0');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -52,15 +52,13 @@ export default function AddTenantScreen() {
       if (yearScrollViewRef.current) {
         const index = yearOptions.indexOf(birthYear);
         if (index !== -1) {
-          // Each year item is roughly 50-60px wide (padding + text)
-          // We'll use a rough estimate for the scroll position
           yearScrollViewRef.current.scrollTo({
-            x: index * 54, // Approximate width of each year item
+            x: index * 54,
             animated: true,
           });
         }
       }
-    }, 500); // Small delay to ensure layout is ready
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [birthYear]);
@@ -74,7 +72,6 @@ export default function AddTenantScreen() {
       const address = project.addresses.find((a) => a.id === addressId);
       if (!address) return;
 
-      // Find tenant in unassignedTenants or in rooms
       let tenant: Tenant | undefined = address.unassignedTenants.find((t) => t.id === tenantId);
       
       if (!tenant) {
@@ -103,7 +100,7 @@ export default function AddTenantScreen() {
   };
 
   const handleSubmit = useCallback(async () => {
-    if (!firstName.trim() || !lastName.trim() || !checkInDate || !monthlyPrice.trim()) {
+    if (!firstName.trim() || !lastName.trim() || !checkInDate) {
       Alert.alert('Błąd', 'Proszę wypełnić wszystkie wymagane pola');
       return;
     }
@@ -125,10 +122,8 @@ export default function AddTenantScreen() {
       }
 
       if (isEditing) {
-        // Update existing tenant
         let tenantUpdated = false;
 
-        // Check unassignedTenants
         const unassignedIndex = address.unassignedTenants.findIndex((t) => t.id === tenantId);
         if (unassignedIndex !== -1) {
           address.unassignedTenants[unassignedIndex] = {
@@ -145,7 +140,6 @@ export default function AddTenantScreen() {
           tenantUpdated = true;
         }
 
-        // Check rooms if not found in unassigned
         if (!tenantUpdated) {
           for (const room of address.rooms) {
             for (const space of room.spaces) {
@@ -177,7 +171,6 @@ export default function AddTenantScreen() {
         await saveData(projects);
         Alert.alert('Sukces', `Dane mieszkańca "${firstName} ${lastName}" zostały zaktualizowane`);
       } else {
-        // Create new tenant WITHOUT room assignment
         const newTenant: Tenant = {
           id: generateUUID(),
           firstName: firstName.trim(),
@@ -190,7 +183,6 @@ export default function AddTenantScreen() {
           phone: phone.trim() || undefined,
         };
 
-        // Add tenant to unassignedTenants array
         address.unassignedTenants.push(newTenant);
 
         await saveData(projects);
@@ -200,7 +192,7 @@ export default function AddTenantScreen() {
       router.back();
     } catch (error) {
       console.error('Error saving tenant:', error);
-      Alert.alert('Błąd', isEditing ? 'Nie udało się zaktualizować danych' : 'Nie udało się dodać mieszkańca');
+      Alert.alert('Błąd', isEditing ? 'Nie удалось się zaktualizować danych' : 'Nie удалось się dodaть mieszkańca');
     } finally {
       setLoading(false);
     }
@@ -224,138 +216,134 @@ export default function AddTenantScreen() {
 
   return (
     <ScreenContainer className="p-4 pt-12 pb-20">
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Header */}
-        <View className="flex-row items-center gap-3 mb-6">
-          <Pressable
-            onPress={() => router.back()}
-            className="bg-surfaceVariant rounded-full p-2"
-          >
-            <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
-          </Pressable>
-          <Text className="text-2xl font-bold text-foreground flex-1">
-            {isEditing ? 'Edytuj mieszkańca' : 'Dodaj mieszkańca'}
-          </Text>
-        </View>
-
-        {/* Form */}
-        <Card className="p-6 gap-4">
-          {/* First Name */}
-          <FormField
-            label="Imię *"
-            value={firstName}
-            onChangeText={setFirstName}
-            placeholder="np. Jan"
-          />
-
-          {/* Last Name */}
-          <FormField
-            label="Nazwisko *"
-            value={lastName}
-            onChangeText={setLastName}
-            placeholder="np. Kowalski"
-          />
-
-          {/* Gender */}
-          <View className="gap-2 mb-4">
-            <Text className="text-sm font-semibold text-foreground">Płeć *</Text>
-            <View className="flex-row gap-3">
-              {(['male', 'female'] as const).map((g) => (
-                <Pressable
-                  key={g}
-                  onPress={() => setGender(g)}
-                  className={`flex-1 rounded-lg py-3 items-center ${
-                    gender === g ? 'bg-primary' : 'bg-surfaceVariant'
-                  }`}
-                >
-                  <Text className={gender === g ? 'text-white font-semibold' : 'text-foreground'}>
-                    {g === 'male' ? 'Mężczyzna' : 'Kobieta'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        className="flex-1"
+      >
+        <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+          <View className="flex-row items-center gap-3 mb-6">
+            <Pressable
+              onPress={() => router.back()}
+              className="bg-surfaceVariant rounded-full p-2"
+            >
+              <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
+            </Pressable>
+            <Text className="text-2xl font-bold text-foreground flex-1">
+              {isEditing ? 'Edytuj mieszkańca' : 'Dodaj mieszkańca'}
+            </Text>
           </View>
 
-          {/* Birth Year Picker */}
-          <View className="gap-2 mb-4">
-            <Text className="text-sm font-semibold text-foreground">Rok urodzenia</Text>
-            <View className="bg-surfaceVariant rounded-lg overflow-hidden">
-              <ScrollView
-                ref={yearScrollViewRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 8 }}
-                className="py-2"
-              >
-                {yearOptions.map((year) => (
+          <Card className="p-6 gap-4">
+            <FormField
+              label="Imię *"
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder="np. Jan"
+            />
+
+            <FormField
+              label="Nazwisko *"
+              value={lastName}
+              onChangeText={setLastName}
+              placeholder="np. Kowalski"
+            />
+
+            <View className="gap-2 mb-4">
+              <Text className="text-sm font-semibold text-foreground">Płeć *</Text>
+              <View className="flex-row gap-3">
+                {(['male', 'female'] as const).map((g) => (
                   <Pressable
-                    key={year}
-                    onPress={() => setBirthYear(year)}
-                    className={`px-3 py-2 rounded-lg mx-1 ${
-                      birthYear === year ? 'bg-primary' : 'bg-surface'
+                    key={g}
+                    onPress={() => setGender(g)}
+                    className={`flex-1 rounded-lg py-3 items-center ${
+                      gender === g ? 'bg-primary' : 'bg-surfaceVariant'
                     }`}
                   >
-                    <Text className={birthYear === year ? 'text-white font-semibold' : 'text-foreground'}>
-                      {year}
+                    <Text className={gender === g ? 'text-white font-semibold' : 'text-foreground'}>
+                      {g === 'male' ? 'Mężczyzna' : 'Kobieta'}
                     </Text>
                   </Pressable>
                 ))}
-              </ScrollView>
+              </View>
             </View>
-          </View>
 
-          {/* Phone */}
-          <FormField
-            label="Telefon"
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="np. +48 123 456 789"
-            keyboardType="phone-pad"
-          />
+            <View className="gap-2 mb-4">
+              <Text className="text-sm font-semibold text-foreground">Rok urodzenia</Text>
+              <View className="bg-surfaceVariant rounded-lg overflow-hidden">
+                <ScrollView
+                  ref={yearScrollViewRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 8 }}
+                  className="py-2"
+                >
+                  {yearOptions.map((year) => (
+                    <Pressable
+                      key={year}
+                      onPress={() => setBirthYear(year)}
+                      className={`px-3 py-2 rounded-lg mx-1 ${
+                        birthYear === year ? 'bg-primary' : 'bg-surface'
+                      }`}
+                    >
+                      <Text className={birthYear === year ? 'text-white font-semibold' : 'text-foreground'}>
+                        {year}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
 
-          {/* Check-in Date */}
-          <View className="gap-2 mb-4">
-            <Text className="text-sm font-semibold text-foreground">Data zamelowania *</Text>
-            <DatePicker
-              value={checkInDate}
-              onChange={setCheckInDate}
-              placeholder="Wybierz datę"
+            <FormField
+              label="Telefon"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="np. +48 123 456 789"
+              keyboardType="phone-pad"
             />
-          </View>
 
-          {/* Work Start Date */}
-          <View className="gap-2 mb-4">
-            <Text className="text-sm font-semibold text-foreground">Data rozpoczęcia pracy</Text>
-            <DatePicker
-              value={workStartDate}
-              onChange={setWorkStartDate}
-              placeholder="Wybierz datę (opcjonalnie)"
-            />
-          </View>
+            <View className="gap-2 mb-4">
+              <Text className="text-sm font-semibold text-foreground">Data zamelowania *</Text>
+              <DatePicker
+                value={checkInDate}
+                onChange={setCheckInDate}
+                placeholder="Wybierz datę"
+              />
+            </View>
 
-          {/* Monthly Price */}
-          <FormField
-            label="Cena miesięczna (zł) *"
-            value={monthlyPrice}
-            onChangeText={setMonthlyPrice}
-            placeholder="np. 500"
-            keyboardType="decimal-pad"
-          />
+            <View className="gap-2 mb-4">
+              <Text className="text-sm font-semibold text-foreground">Data rozpoczęcia pracy</Text>
+              <DatePicker
+                value={workStartDate}
+                onChange={setWorkStartDate}
+                placeholder="Wybierz datę (opcjonalnie)"
+              />
+            </View>
 
-          {/* Submit Button */}
-          <Pressable
-            onPress={handleSubmit}
-            disabled={loading}
-            className={`rounded-lg py-3 items-center mt-4 ${
-              loading ? 'bg-muted' : 'bg-primary'
-            }`}
-          >
-            <Text className="text-white font-semibold">
-              {loading ? (isEditing ? 'Zapisywanie...' : 'Dodawanie...') : (isEditing ? 'Zapisz zmiany' : 'Dodaj mieszkańca')}
-            </Text>
-          </Pressable>
-        </Card>
-      </ScrollView>
+            {isEditing && (
+              <FormField
+                label="Cena miesięczna (zł) *"
+                value={monthlyPrice}
+                onChangeText={setMonthlyPrice}
+                placeholder="np. 500"
+                keyboardType="decimal-pad"
+              />
+            )}
+
+            <Pressable
+              onPress={handleSubmit}
+              disabled={loading}
+              className={`rounded-lg py-3 items-center mt-4 ${
+                loading ? 'bg-muted' : 'bg-primary'
+              }`}
+            >
+              <Text className="text-white font-semibold">
+                {loading ? (isEditing ? 'Zapisywanie...' : 'Dodawanie...') : (isEditing ? 'Zapisz zmiany' : 'Dodaj mieszkańca')}
+              </Text>
+            </Pressable>
+          </Card>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }

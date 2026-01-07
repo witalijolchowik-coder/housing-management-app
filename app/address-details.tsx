@@ -12,6 +12,7 @@ import { Address, Room, Tenant, Project, EvictionFormData } from '@/types';
 import { loadData, calculateRoomStats, getDaysRemaining, saveData } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 import { EvictionFormModal } from '@/components/eviction-form-modal';
+import { GenderIcon } from '@/components/ui/gender-icon';
 
 export default function AddressDetailsScreen() {
   const t = useTranslations();
@@ -116,7 +117,7 @@ export default function AddressDetailsScreen() {
     if (hasOccupiedSpaces) {
       Alert.alert(
         'Nie można usunąć pokoju',
-        'W pokoju znajdują się mieszkańcy. Najpierw wymelduj wszystkich mieszkańców z tego pokoju.',
+        'W pokoju znajdują się mieszkańcy. Najpierw wymelduj всех mieszkańców z tego pokoju.',
         [{ text: 'OK' }]
       );
       return;
@@ -163,9 +164,12 @@ export default function AddressDetailsScreen() {
             )}
           </View>
           <View className="flex-1 justify-center gap-1">
-            <Text className="font-semibold text-foreground">
-              {item.firstName} {item.lastName} <Text className="text-muted">({item.birthYear})</Text>
-            </Text>
+            <View className="flex-row items-center gap-2">
+              <Text className="font-semibold text-foreground">
+                {item.firstName} {item.lastName} <Text className="text-muted">({item.birthYear})</Text>
+              </Text>
+              <GenderIcon gender={item.gender as any} showCount={false} size={14} />
+            </View>
             <Text className="text-xs text-muted">{item.checkInDate}</Text>
           </View>
           <View className="justify-center items-end gap-1">
@@ -195,16 +199,7 @@ export default function AddressDetailsScreen() {
 
   const renderRoomCard = ({ item }: { item: Room }) => {
     const stats = calculateRoomStats(item);
-    const occupancyPercent = stats.total > 0
-      ? Math.round(((stats.occupied + stats.wypowiedzenie) / stats.total) * 100)
-      : 0;
-
-    const roomTypeLabel = {
-      male: t.roomDetails.male,
-      female: t.roomDetails.female,
-      couple: t.roomDetails.couple,
-    };
-
+    
     return (
       <View>
         <Pressable
@@ -219,15 +214,12 @@ export default function AddressDetailsScreen() {
         >
           <Card className="p-3 mb-3">
             <View className="gap-2">
-              {/* Header row with room name and menu */}
               <View className="flex-row justify-between items-center">
                 <View className="flex-1">
                   <Text className="text-lg font-bold text-foreground mb-0.5">
                     {item.name}
                   </Text>
-                  <Text className="text-xs text-muted">
-                    {roomTypeLabel[item.type]}
-                  </Text>
+                  <GenderIcon gender={item.type as any} showCount={false} size={14} />
                 </View>
                 <Pressable
                   onPress={() => {
@@ -240,12 +232,10 @@ export default function AddressDetailsScreen() {
                 </Pressable>
               </View>
 
-              {/* Occupancy progress */}
               <View className="pt-1">
                 <OccupancyProgress occupied={stats.occupied} total={stats.total} size="sm" />
               </View>
 
-              {/* Eviction warning (if any) */}
               {stats.wypowiedzenie > 0 && (
                 <View className="flex-row items-center gap-2 pt-1">
                   <MaterialIcons name="warning" size={14} color={colors.warning} />
@@ -261,37 +251,21 @@ export default function AddressDetailsScreen() {
     );
   };
 
-  // Combine assigned tenants (from rooms) and unassigned tenants
   const assignedTenants = address.rooms.flatMap((room) =>
     room.spaces.filter((space) => space.tenant).map((space) => space.tenant!)
   );
   const residents = [...address.unassignedTenants, ...assignedTenants];
 
   const handleBackPress = () => {
-    // Check if there are unassigned tenants
     if (address.unassignedTenants && address.unassignedTenants.length > 0) {
       const firstTenant = address.unassignedTenants[0];
       const tenantName = `${firstTenant.firstName} ${firstTenant.lastName}`;
       Alert.alert(
         'Niezakończona operacja zaselenia',
-        `Mieszkaniec ${tenantName} nie ma przydzielonego miejsca. Przejdź do karty Pokoje i wybierz dla niego pokój, lub usuń go, jeśli został dodany przez pomyłkę.`,
+        `Mieszkaniec ${tenantName} nie został zakwaterowany do pokoju. Czy na pewno chcesz wyjść?`,
         [
-          {
-            text: 'Anuluj',
-            onPress: () => {},
-            style: 'cancel',
-          },
-          {
-            text: 'Usuń mieszkańca',
-            onPress: () => handleDeleteTenant(firstTenant),
-            style: 'destructive',
-          },
-          {
-            text: 'Przejdź do Pokojów',
-            onPress: () => {
-              setActiveTab('rooms');
-            },
-          },
+          { text: 'Anuluj', style: 'cancel' },
+          { text: 'Wyjdź', style: 'destructive', onPress: () => router.back() }
         ]
       );
     } else {
@@ -301,71 +275,51 @@ export default function AddressDetailsScreen() {
 
   return (
     <ScreenContainer>
-      {/* Header */}
-      <View className="flex-row items-center gap-2 mb-4">
-        <Pressable onPress={handleBackPress} className="p-2">
+      <View className="flex-row items-center px-4 py-4 border-b border-border">
+        <Pressable onPress={handleBackPress} className="mr-4">
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </Pressable>
-        <Text className="text-2xl font-bold text-foreground flex-1">{address.name}</Text>
+        <View className="flex-1">
+          <Text className="text-xl font-bold text-foreground">{address.name}</Text>
+          <Text className="text-xs text-muted">{address.fullAddress}</Text>
+        </View>
       </View>
 
-      {/* Tabs */}
-      <View className="flex-row gap-2 mb-4">
+      <View className="flex-row p-4 gap-2">
         <Pressable
           onPress={() => setActiveTab('residents')}
-          className={`flex-1 py-3 px-4 rounded-full ${activeTab === 'residents' ? 'bg-primary' : 'bg-surface'}`}
+          className={`flex-1 py-2 rounded-lg items-center ${activeTab === 'residents' ? 'bg-primary' : 'bg-surfaceVariant'}`}
         >
-          <Text className={`text-center font-semibold ${activeTab === 'residents' ? 'text-background' : 'text-foreground'}`}>
-            Mieszkańcy
+          <Text className={`font-semibold ${activeTab === 'residents' ? 'text-foreground' : 'text-muted'}`}>
+            {t.addressDetails.residents} ({residents.length})
           </Text>
         </Pressable>
         <Pressable
           onPress={() => setActiveTab('rooms')}
-          className={`flex-1 py-3 px-4 rounded-full ${activeTab === 'rooms' ? 'bg-primary' : 'bg-surface'}`}
+          className={`flex-1 py-2 rounded-lg items-center ${activeTab === 'rooms' ? 'bg-primary' : 'bg-surfaceVariant'}`}
         >
-          <Text className={`text-center font-semibold ${activeTab === 'rooms' ? 'text-background' : 'text-foreground'}`}>
-            Pokoje
+          <Text className={`font-semibold ${activeTab === 'rooms' ? 'text-foreground' : 'text-muted'}`}>
+            {t.addressDetails.rooms} ({address.rooms.length})
           </Text>
         </Pressable>
       </View>
 
-      {/* Content */}
-      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
-        {activeTab === 'residents' ? (
-          <View>
-            {residents.length === 0 ? (
-              <View className="items-center justify-center py-8">
-                <Text className="text-muted">{t.messages.emptyAddress}</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={residents}
-                renderItem={renderResidentCard}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-              />
-            )}
+      <FlatList
+        data={activeTab === 'residents' ? residents : address.rooms}
+        renderItem={activeTab === 'residents' ? renderResidentCard : renderRoomCard}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        ListEmptyComponent={
+          <View className="py-20 items-center">
+            <Text className="text-muted">
+              {activeTab === 'residents' ? t.messages.emptyResident : t.messages.emptyRoom}
+            </Text>
           </View>
-        ) : (
-          <View>
-            {address.rooms.length === 0 ? (
-              <View className="items-center justify-center py-8">
-                <Text className="text-muted">{t.messages.emptyAddress}</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={address.rooms}
-                renderItem={renderRoomCard}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-              />
-            )}
-          </View>
-        )}
-      </ScrollView>
+        }
+      />
 
-      {/* FAB Button */}
-      <Pressable
+      <FAB
+        icon="add"
         onPress={() => {
           if (activeTab === 'residents') {
             router.push({
@@ -379,15 +333,8 @@ export default function AddressDetailsScreen() {
             });
           }
         }}
-        className="absolute bottom-20 right-4 w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg"
-        style={({ pressed }) => ({
-          opacity: pressed ? 0.8 : 1,
-        })}
-      >
-        <MaterialIcons name="add" size={28} color={colors.background} />
-      </Pressable>
+      />
 
-      {/* Tenant Menu Modal */}
       <Modal
         visible={tenantMenuVisible}
         transparent
@@ -395,41 +342,61 @@ export default function AddressDetailsScreen() {
         onRequestClose={() => setTenantMenuVisible(false)}
       >
         <Pressable
+          className="flex-1 bg-black/50 justify-end"
           onPress={() => setTenantMenuVisible(false)}
-          className="flex-1 bg-black/50 items-center justify-center"
         >
-          <Card className="w-48 p-2 gap-1">
+          <View className="bg-surface p-6 rounded-t-3xl gap-4">
+            <Text className="text-lg font-bold text-foreground mb-2">
+              {selectedTenant?.firstName} {selectedTenant?.lastName}
+            </Text>
+            <Pressable
+              onPress={() => {
+                setTenantMenuVisible(false);
+                router.push({
+                  pathname: '/tenant-details',
+                  params: { projectId, addressId, tenantId: selectedTenant?.id },
+                });
+              }}
+              className="flex-row items-center gap-3 py-2"
+            >
+              <MaterialIcons name="person" size={24} color={colors.primary} />
+              <Text className="text-foreground font-medium">{t.common.details}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setTenantMenuVisible(false);
+                router.push({
+                  pathname: '/add-tenant',
+                  params: { projectId, addressId, tenantId: selectedTenant?.id },
+                });
+              }}
+              className="flex-row items-center gap-3 py-2"
+            >
+              <MaterialIcons name="edit" size={24} color={colors.primary} />
+              <Text className="text-foreground font-medium">{t.common.edit}</Text>
+            </Pressable>
             <Pressable
               onPress={() => {
                 if (selectedTenant) {
-                  router.push({
-                    pathname: '/add-tenant',
-                    params: { projectId, addressId, tenantId: selectedTenant.id },
-                  });
+                  Alert.alert(
+                    t.common.delete,
+                    `Czy na pewno chcesz usunąć mieszkańca ${selectedTenant.firstName} ${selectedTenant.lastName}?`,
+                    [
+                      { text: t.common.cancel, style: 'cancel' },
+                      { text: t.common.delete, style: 'destructive', onPress: () => handleDeleteTenant(selectedTenant) },
+                    ]
+                  );
                 }
-                setTenantMenuVisible(false);
               }}
-              className="p-3 flex-row items-center gap-2"
+              className="flex-row items-center gap-3 py-2"
             >
-              <MaterialIcons name="edit" size={20} color={colors.foreground} />
-              <Text className="text-foreground">{t.common.edit}</Text>
+              <MaterialIcons name="delete" size={24} color={colors.error} />
+              <Text className="text-error font-medium">{t.common.delete}</Text>
             </Pressable>
-            <Pressable
-              onPress={() => {
-                setTenantMenuVisible(false);
-                setEvictionModalVisible(true);
-              }}
-              className="p-3 flex-row items-center gap-2"
-            >
-              <MaterialIcons name="logout" size={20} color={colors.error} />
-              <Text className="text-error">{t.common.evict}</Text>
-            </Pressable>
-
-          </Card>
+          </View>
         </Pressable>
       </Modal>
 
-      {/* Room Menu Modal */}
       <Modal
         visible={roomMenuVisible}
         transparent
@@ -437,140 +404,73 @@ export default function AddressDetailsScreen() {
         onRequestClose={() => setRoomMenuVisible(false)}
       >
         <Pressable
+          className="flex-1 bg-black/50 justify-end"
           onPress={() => setRoomMenuVisible(false)}
-          className="flex-1 bg-black/50 items-center justify-center"
         >
-          <Card className="w-48 p-2 gap-1">
+          <View className="bg-surface p-6 rounded-t-3xl gap-4">
+            <Text className="text-lg font-bold text-foreground mb-2">
+              {selectedRoom?.name}
+            </Text>
             <Pressable
               onPress={() => {
-                if (selectedRoom) {
-                  router.push({
-                    pathname: '/edit-room',
-                    params: { projectId, addressId, roomId: selectedRoom.id },
-                  });
-                }
                 setRoomMenuVisible(false);
+                router.push({
+                  pathname: '/room-details',
+                  params: { projectId, addressId, roomId: selectedRoom?.id },
+                });
               }}
-              className="p-3 flex-row items-center gap-2"
+              className="flex-row items-center gap-3 py-2"
             >
-              <MaterialIcons name="edit" size={20} color={colors.foreground} />
-              <Text className="text-foreground">{t.common.edit}</Text>
+              <MaterialIcons name="meeting-room" size={24} color={colors.primary} />
+              <Text className="text-foreground font-medium">{t.common.details}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setRoomMenuVisible(false);
+                router.push({
+                  pathname: '/add-room',
+                  params: { projectId, addressId, roomId: selectedRoom?.id },
+                });
+              }}
+              className="flex-row items-center gap-3 py-2"
+            >
+              <MaterialIcons name="edit" size={24} color={colors.primary} />
+              <Text className="text-foreground font-medium">{t.common.edit}</Text>
             </Pressable>
             <Pressable
               onPress={() => {
                 if (selectedRoom) {
-                  handleDeleteRoom(selectedRoom);
+                  Alert.alert(
+                    t.common.delete,
+                    `Czy na pewno chcesz usunąć pokój ${selectedRoom.name}?`,
+                    [
+                      { text: t.common.cancel, style: 'cancel' },
+                      { text: t.common.delete, style: 'destructive', onPress: () => handleDeleteRoom(selectedRoom) },
+                    ]
+                  );
                 }
               }}
-              className="p-3 flex-row items-center gap-2"
+              className="flex-row items-center gap-3 py-2"
             >
-              <MaterialIcons name="delete" size={20} color={colors.error} />
-              <Text className="text-error">{t.common.delete}</Text>
+              <MaterialIcons name="delete" size={24} color={colors.error} />
+              <Text className="text-error font-medium">{t.common.delete}</Text>
             </Pressable>
-          </Card>
+          </View>
         </Pressable>
       </Modal>
-
-      {/* Eviction Form Modal */}
-      <EvictionFormModal
-        visible={evictionModalVisible}
-        tenant={selectedTenant}
-        projectAddresses={project?.addresses || []}
-        currentAddressId={addressId as string}
-        onClose={() => {
-          setEvictionModalVisible(false);
-          setSelectedTenant(undefined);
-        }}
-        onSave={async (data) => {
-          if (!selectedTenant || !address) return;
-          
-          try {
-            const projects = await loadData();
-            const proj = projects.find((p) => p.id === projectId);
-            if (!proj) return;
-            
-            const addr = proj.addresses.find((a) => a.id === addressId);
-            if (!addr) return;
-            
-            // Handle relocation to another address
-            if (data.reason === 'relocation' && data.targetAddressId) {
-              const targetAddr = proj.addresses.find((a) => a.id === data.targetAddressId);
-              if (targetAddr) {
-                // Remove tenant from current address
-                addr.unassignedTenants = addr.unassignedTenants.filter(t => t.id !== selectedTenant.id);
-                if (selectedTenant.spaceId) {
-                  for (const room of addr.rooms) {
-                    const space = room.spaces.find(s => s.id === selectedTenant.spaceId);
-                    if (space && space.tenant) {
-                      // Clear spaceId before removing tenant
-                      space.tenant.spaceId = undefined;
-                      space.tenant = null;
-                      space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
-                    }
-                  }
-                }
-                
-                // Add tenant to target address unassignedTenants
-                const relocatedTenant = { ...selectedTenant };
-                delete relocatedTenant.spaceId; // Remove space assignment
-                targetAddr.unassignedTenants.push(relocatedTenant);
-                
-                await saveData(projects);
-                await loadAddress();
-                setEvictionModalVisible(false);
-                setSelectedTenant(undefined);
-                Alert.alert('Sukces', `Mieszkaniec przeniesiony na adres: ${targetAddr.name}`);
-                return;
-              }
-            }
-            
-            // Handle regular eviction (move to archive)
-            // Remove from unassignedTenants if present
-            addr.unassignedTenants = addr.unassignedTenants.filter(t => t.id !== selectedTenant.id);
-            
-            // Remove from rooms if assigned
-            if (selectedTenant.spaceId) {
-              for (const room of addr.rooms) {
-                const space = room.spaces.find(s => s.id === selectedTenant.spaceId);
-                if (space && space.tenant) {
-                  // Clear spaceId before removing tenant
-                  space.tenant.spaceId = undefined;
-                  space.tenant = null;
-                  space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
-                }
-              }
-            }
-            
-            // Add to eviction archive
-            if (!proj.evictionArchive) {
-              proj.evictionArchive = [];
-            }
-            proj.evictionArchive.push({
-              id: `eviction-${Date.now()}`,
-              tenantId: selectedTenant.id,
-              firstName: selectedTenant.firstName,
-              lastName: selectedTenant.lastName,
-              projectId: proj.id,
-              projectName: proj.name,
-              addressId: addr.id,
-              addressName: addr.name,
-              checkInDate: selectedTenant.checkInDate,
-              checkOutDate: data.checkoutDate,
-              reason: data.reason,
-              createdAt: new Date().toISOString(),
-            });
-            
-            await saveData(projects);
-            await loadAddress();
-            setEvictionModalVisible(false);
-            setSelectedTenant(undefined);
-            Alert.alert('Sukces', 'Mieszkaniec został wyselony');
-          } catch (error) {
-            console.error('Error evicting tenant:', error);
-            Alert.alert('Błąd', 'Wystąpił błąd podczas wyselenia');
-          }
-        }}
-      />
     </ScreenContainer>
+  );
+}
+
+function FAB({ icon, onPress }: { icon: keyof typeof MaterialIcons.glyphMap; onPress: () => void }) {
+  const colors = useColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      className="absolute bottom-8 right-8 w-14 h-14 rounded-full bg-primary items-center justify-center shadow-lg"
+      style={{ elevation: 5 }}
+    >
+      <MaterialIcons name={icon} size={30} color="white" />
+    </Pressable>
   );
 }

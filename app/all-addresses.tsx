@@ -1,14 +1,13 @@
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useColors } from '@/hooks/use-colors';
 import { useTranslations } from '@/hooks/use-translations';
+import { useColors } from '@/hooks/use-colors';
 import { loadData } from '@/lib/store';
 import { Project, Address } from '@/types';
-import { useRouter } from 'expo-router';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 
 interface AddressWithProject extends Address {
   projectName: string;
@@ -16,15 +15,17 @@ interface AddressWithProject extends Address {
 }
 
 export default function AllAddressesScreen() {
-  const colors = useColors();
   const t = useTranslations();
+  const colors = useColors();
   const router = useRouter();
   const [groupedAddresses, setGroupedAddresses] = useState<Record<string, AddressWithProject[]>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadAllAddresses();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadAllAddresses();
+    }, [])
+  );
 
   const loadAllAddresses = async () => {
     try {
@@ -32,29 +33,19 @@ export default function AllAddressesScreen() {
       const projects = await loadData();
       const all: AddressWithProject[] = [];
       
-      if (projects && Array.isArray(projects)) {
-        projects.forEach(project => {
-          if (project.addresses && Array.isArray(project.addresses)) {
-            project.addresses.forEach(address => {
-              all.push({
-                ...address,
-                projectName: project.name || 'Bez nazwy',
-                projectId: project.id
-              });
-            });
-          }
+      projects.forEach(project => {
+        project.addresses.forEach(address => {
+          all.push({
+            ...address,
+            projectName: project.name,
+            projectId: project.id
+          });
         });
-      }
+      });
 
       // Group by city
       const grouped = all.reduce((acc, addr) => {
-        let city = 'Inne';
-        if (addr.fullAddress) {
-          const parts = addr.fullAddress.split(',');
-          if (parts.length > 0) {
-            city = parts[0].trim() || 'Inne';
-          }
-        }
+        const city = addr.city || 'Inne';
         if (!acc[city]) acc[city] = [];
         acc[city].push(addr);
         return acc;
@@ -62,98 +53,111 @@ export default function AllAddressesScreen() {
 
       setGroupedAddresses(grouped);
     } catch (error) {
-      console.error('Error loading addresses:', error);
+      console.error('Error loading all addresses:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const getOccupancyStats = (address: Address) => {
-    let males = 0;
-    let females = 0;
-    let couples = 0;
+    let male = 0;
+    let female = 0;
+    let pairs = 0;
 
-    if (address.rooms && Array.isArray(address.rooms)) {
-      address.rooms.forEach(room => {
-        if (room.spaces && Array.isArray(room.spaces)) {
-          room.spaces.forEach(space => {
-            if (space.tenant) {
-              if (room.type === 'couple') {
-                couples++;
-              } else if (space.tenant.gender === 'male') {
-                males++;
-              } else if (space.tenant.gender === 'female') {
-                females++;
-              }
-            }
-          });
+    address.rooms.forEach(room => {
+      room.spaces.forEach(space => {
+        if (space.tenant) {
+          if (room.type === 'pair') {
+            pairs++;
+          } else if (space.tenant.gender === 'male') {
+            male++;
+          } else {
+            female++;
+          }
         }
       });
-    }
+    });
 
-    return { males, females, couples: Math.floor(couples / 2) };
+    return { male, female, pairs };
+  };
+
+  const sortedCities = Object.keys(groupedAddresses).sort((a, b) => a.localeCompare(b));
+
+  const getOperatorLabel = (operator?: string) => {
+    switch (operator) {
+      case 'rent_planet': return 'Rent Planet';
+      case 'e_port': return 'E-Port';
+      case 'other': return 'Inne';
+      default: return operator || '-';
+    }
   };
 
   return (
-    <ScreenContainer>
-      <View className="flex-row items-center px-4 py-4 border-b border-border">
-        <Pressable onPress={() => router.back()} className="mr-4">
+    <ScreenContainer className="p-4">
+      <View className="flex-row items-center gap-3 mb-6">
+        <Pressable
+          onPress={() => router.back()}
+          className="bg-surfaceVariant rounded-full p-2"
+        >
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </Pressable>
-        <Text className="text-xl font-bold text-foreground">Wszystkie Lokale</Text>
+        <Text className="text-2xl font-bold text-foreground">Wszystkie Lokale</Text>
       </View>
 
-      <ScrollView className="flex-1 p-4">
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {loading ? (
-          <Text className="text-muted text-center mt-10">{t.common.loading}</Text>
-        ) : Object.keys(groupedAddresses).length === 0 ? (
-          <Text className="text-muted text-center mt-10">Brak adresów</Text>
+          <View className="py-20 items-center">
+            <Text className="text-muted">{t.common.loading}</Text>
+          </View>
+        ) : sortedCities.length === 0 ? (
+          <View className="py-20 items-center">
+            <Text className="text-muted">Brak dodanych lokali</Text>
+          </View>
         ) : (
-          Object.entries(groupedAddresses).sort().map(([city, addresses]) => (
+          sortedCities.map(city => (
             <View key={city} className="mb-6">
-              <Text className="text-lg font-bold text-primary mb-3 px-1">{city}</Text>
-              {addresses.map((address) => {
+              <View className="flex-row items-center gap-2 mb-3 px-1">
+                <MaterialIcons name="location-city" size={20} color={colors.primary} />
+                <Text className="text-lg font-bold text-foreground">{city}</Text>
+                <View className="h-[1px] flex-1 bg-border/30 ml-2" />
+              </View>
+
+              {groupedAddresses[city].map(address => {
                 const stats = getOccupancyStats(address);
                 return (
                   <Pressable 
-                    key={address.id}
+                    key={address.id} 
                     onPress={() => router.push({
-                      pathname: '/address-list',
-                      params: { projectId: address.projectId, initialAddressId: address.id }
+                      pathname: '/address-details',
+                      params: { projectId: address.projectId, addressId: address.id }
                     })}
+                    className="mb-3"
                   >
-                    <Card className="p-4 mb-3">
+                    <Card className="p-4">
                       <View className="flex-row justify-between items-start mb-2">
                         <View className="flex-1">
                           <Text className="text-base font-bold text-foreground">{address.name}</Text>
-                          <Text className="text-xs text-muted mt-0.5">{address.fullAddress}</Text>
-                        </View>
-                        <Badge variant="outline" label={address.projectName} size="sm" />
-                      </View>
-
-                      <View className="flex-row items-center gap-4 mt-2 pt-2 border-t border-border/30">
-                        <View className="flex-row items-center gap-1">
-                          <MaterialIcons name="business" size={14} color={colors.muted} />
-                          <Text className="text-xs text-muted">
-                            {address.operator === 'rent_planet' ? 'Rent Planet' : 
-                             address.operator === 'e_port' ? 'E-Port' : 
-                             address.operatorName || 'Inny'}
+                          <Text className="text-xs text-muted mt-0.5">
+                            Projekt: <Text className="text-foreground/70">{address.projectName}</Text>
                           </Text>
                         </View>
-                        
-                        <View className="flex-row items-center gap-3 ml-auto">
-                          <View className="flex-row items-center gap-1">
-                            <MaterialIcons name="male" size={14} color="#3b82f6" />
-                            <Text className="text-xs font-medium text-foreground">{stats.males}</Text>
-                          </View>
-                          <View className="flex-row items-center gap-1">
-                            <MaterialIcons name="female" size={14} color="#ec4899" />
-                            <Text className="text-xs font-medium text-foreground">{stats.females}</Text>
-                          </View>
-                          <View className="flex-row items-center gap-1">
-                            <MaterialIcons name="people" size={14} color="#8b5cf6" />
-                            <Text className="text-xs font-medium text-foreground">{stats.couples}</Text>
-                          </View>
+                        <View className="px-2 py-0.5 rounded-full border border-border/50 bg-surfaceVariant/30">
+                          <Text className="text-[10px] font-medium text-muted-foreground">{getOperatorLabel(address.operator)}</Text>
+                        </View>
+                      </View>
+
+                      <View className="flex-row items-center gap-4 mt-2 pt-2 border-t border-border/20">
+                        <View className="flex-row items-center gap-1.5">
+                          <FontAwesome5 name="mars" size={14} color="#3b82f6" />
+                          <Text className="text-sm font-bold text-foreground">{stats.male}</Text>
+                        </View>
+                        <View className="flex-row items-center gap-1.5">
+                          <FontAwesome5 name="venus" size={14} color="#ec4899" />
+                          <Text className="text-sm font-bold text-foreground">{stats.female}</Text>
+                        </View>
+                        <View className="flex-row items-center gap-1.5">
+                          <FontAwesome5 name="user-friends" size={14} color="#a855f7" />
+                          <Text className="text-sm font-bold text-foreground">{stats.pairs}</Text>
                         </View>
                       </View>
                     </Card>
@@ -163,7 +167,6 @@ export default function AllAddressesScreen() {
             </View>
           ))
         )}
-        <View className="h-10" />
       </ScrollView>
     </ScreenContainer>
   );

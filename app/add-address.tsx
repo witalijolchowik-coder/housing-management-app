@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, Pressable, TextInput, Alert } from 'react-native';
+import { ScrollView, Text, View, Pressable, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
@@ -40,7 +40,7 @@ export default function AddAddressScreen() {
 
     const roomCount = parseInt(totalRooms) || 0;
     if (roomCount <= 0) {
-      Alert.alert('Błąd', 'Liczba pokoi musi być większa niż 0');
+      Alert.alert('Błąd', 'Liczba pokoi musi być więksза niż 0');
       return;
     }
 
@@ -48,21 +48,19 @@ export default function AddAddressScreen() {
       setLoading(true);
       const projects = await loadData();
       
-      // Add to first project (or create if none exists)
       if (projects.length === 0) {
         Alert.alert('Błąd', 'Brak projektów. Proszę najpierw utworzyć projekt.');
         return;
       }
 
-      // Generate empty rooms
       const rooms: Room[] = [];
       for (let i = 1; i <= roomCount; i++) {
         const roomId = generateUUID();
         const room: Room = {
           id: roomId,
-          addressId: '', // Will be set below
+          addressId: '',
           name: `Pokój ${i}`,
-          type: 'male', // Default type
+          type: 'male',
           totalSpaces: 0,
           spaces: [],
         };
@@ -84,13 +82,12 @@ export default function AddAddressScreen() {
         pricePerSpace: 0,
         rooms: rooms.map((r) => ({
           ...r,
-          addressId: '', // Placeholder, will be set properly
+          addressId: '',
         })),
         unassignedTenants: [],
         photos: [],
       };
 
-      // Set addressId for all rooms
       newAddress.rooms.forEach((room) => {
         room.addressId = newAddress.id;
       });
@@ -125,94 +122,95 @@ export default function AddAddressScreen() {
 
   return (
     <ScreenContainer className="p-4 pt-12 pb-20">
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Header */}
-        <View className="flex-row items-center gap-3 mb-6">
-          <Pressable
-            onPress={() => router.back()}
-            className="bg-surfaceVariant rounded-full p-2"
-          >
-            <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
-          </Pressable>
-          <Text className="text-2xl font-bold text-foreground flex-1">Dodaj adres</Text>
-        </View>
-
-        {/* Form */}
-        <Card className="p-6 gap-4">
-          <FormField
-            label="Nazwa adresu *"
-            value={name}
-            onChangeText={setName}
-            placeholder="np. Apartamenty Centrum"
-          />
-
-          <FormField
-            label="Pełny adres *"
-            value={fullAddress}
-            onChangeText={setFullAddress}
-            placeholder="ul. Główna 123, Warszawa"
-            multiline
-          />
-
-          <FormField
-            label="Liczba pokoi *"
-            value={totalRooms}
-            onChangeText={setTotalRooms}
-            placeholder="4"
-            keyboardType="number-pad"
-          />
-
-          <FormField
-            label="Pokoje dla par (opcjonalnie)"
-            value={coupleRooms}
-            onChangeText={setCoupleRooms}
-            placeholder="0"
-            keyboardType="number-pad"
-          />
-
-          <FormField
-            label="Nazwa firmy *"
-            value={companyName}
-            onChangeText={setCompanyName}
-            placeholder="np. Zarządzanie Nieruchomościami Sp. z o.o."
-          />
-
-          <FormField
-            label="Imię i nazwisko właściciela *"
-            value={ownerName}
-            onChangeText={setOwnerName}
-            placeholder="Jan Kowalski"
-          />
-
-          <FormField
-            label="Numer telefonu *"
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="+48 123 456 789"
-          />
-
-          {/* Info Box */}
-          <View className="bg-surface rounded-lg p-3 border border-primary/30">
-            <Text className="text-xs text-muted">
-              💡 Po utworzeniu adresu pojawi się {totalRooms || '0'} pokoi: Pokój 1, Pokój 2, itd. Możesz je edytować lub usuwać.
-            </Text>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        className="flex-1"
+      >
+        <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+          <View className="flex-row items-center gap-3 mb-6">
+            <Pressable
+              onPress={() => router.back()}
+              className="bg-surfaceVariant rounded-full p-2"
+            >
+              <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
+            </Pressable>
+            <Text className="text-2xl font-bold text-foreground flex-1">Dodaj adres</Text>
           </View>
 
-          {/* Submit Button */}
-          <Pressable
-            onPress={handleSubmit}
-            disabled={loading}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.9 : 1,
-            })}
-            className="bg-primary rounded-lg px-6 py-4 items-center mt-4"
-          >
-            <Text className="text-background font-semibold text-base">
-              {loading ? 'Ładowanie...' : 'Dodaj adres'}
-            </Text>
-          </Pressable>
-        </Card>
-      </ScrollView>
+          <Card className="p-6 gap-4">
+            <FormField
+              label="Nazwa adresu *"
+              value={name}
+              onChangeText={setName}
+              placeholder="np. Apartamenty Centrum"
+            />
+
+            <FormField
+              label="Pełny adres *"
+              value={fullAddress}
+              onChangeText={setFullAddress}
+              placeholder="ul. Główna 123, Warszawa"
+              multiline
+            />
+
+            <FormField
+              label="Liczba pokoi *"
+              value={totalRooms}
+              onChangeText={setTotalRooms}
+              placeholder="4"
+              keyboardType="number-pad"
+            />
+
+            <FormField
+              label="Pokoje dla par (opcjonalnie)"
+              value={coupleRooms}
+              onChangeText={setCoupleRooms}
+              placeholder="0"
+              keyboardType="number-pad"
+            />
+
+            <FormField
+              label="Nazwa firmy *"
+              value={companyName}
+              onChangeText={setCompanyName}
+              placeholder="np. Zarządzanie Nieruchomościami Sp. z o.o."
+            />
+
+            <FormField
+              label="Imię i nazwisko właściciela *"
+              value={ownerName}
+              onChangeText={setOwnerName}
+              placeholder="Jan Kowalski"
+            />
+
+            <FormField
+              label="Numer telefonu *"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+48 123 456 789"
+            />
+
+            <View className="bg-surface rounded-lg p-3 border border-primary/30">
+              <Text className="text-xs text-muted">
+                💡 Po utworzeniu adresu pojawi się {totalRooms || '0'} pokoi: Pokój 1, Pokój 2, itd. Możesz je edytować lub usuwać.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={handleSubmit}
+              disabled={loading}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.9 : 1,
+              })}
+              className="bg-primary rounded-lg px-6 py-4 items-center mt-4"
+            >
+              <Text className="text-background font-semibold text-base">
+                {loading ? 'Ładowanie...' : 'Dodaj adres'}
+              </Text>
+            </Pressable>
+          </Card>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }

@@ -98,15 +98,17 @@ export default function SearchScreen() {
     };
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
+  const handleSearch = async (queryOverride?: string, archiveOverride?: boolean) => {
+    const query = (queryOverride !== undefined ? queryOverride : searchQuery).toLowerCase().trim();
+    const searchArchive = archiveOverride !== undefined ? archiveOverride : searchInArchive;
+
+    if (!query) {
       setSearchResults([]);
       return;
     }
 
     try {
       setLoading(true);
-      const query = searchQuery.toLowerCase().trim();
       const results: TenantWithHistory[] = [];
 
       for (const project of projects) {
@@ -142,7 +144,7 @@ export default function SearchScreen() {
       }
 
       // Search in archive if checkbox is enabled
-      if (searchInArchive) {
+      if (searchArchive) {
         const archive = await loadEvictionArchive();
         for (const entry of archive) {
           const firstName = entry.firstName.toLowerCase();
@@ -433,7 +435,9 @@ export default function SearchScreen() {
           onPress={() => {
             const newValue = !searchInArchive;
             setSearchInArchive(newValue);
-            handleSearch(searchQuery, newValue);
+            if (searchQuery.trim()) {
+              handleSearch(searchQuery, newValue);
+            }
           }}
           className="flex-row items-center gap-2"
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
@@ -445,7 +449,7 @@ export default function SearchScreen() {
               <MaterialIcons name="check" size={16} color="white" />
             )}
           </View>
-          <Text className="text-sm text-foreground">Szukaj в archiwum</Text>
+          <Text className="text-sm text-foreground">Szukaj w archiwum</Text>
         </Pressable>
       </View>
 

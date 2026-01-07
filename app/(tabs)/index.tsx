@@ -37,7 +37,7 @@ export default function DashboardScreen() {
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
   const [addressMappings, setAddressMappings] = useState<Map<string, string>>(new Map());
   const [pendingCSVRows, setPendingCSVRows] = useState<any[]>([]);
-  const [filterProjectId, setFilterProjectId] = useState<string | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -75,8 +75,8 @@ export default function DashboardScreen() {
     let totalAddresses = 0;
     let conflictCount = 0;
 
-    const projectsToCalculate = filterProjectId 
-      ? projects.filter(p => p.id === filterProjectId)
+    const projectsToCalculate = activeProjectId 
+      ? projects.filter(p => p.id === activeProjectId)
       : projects;
 
     for (const project of projectsToCalculate) {
@@ -152,7 +152,7 @@ export default function DashboardScreen() {
       
       const rows = parseCSV(csvText);
       if (rows.length === 0) {
-        Alert.alert('Błąd', 'Nie udało się odczyтать данные из файла CSV');
+        Alert.alert('Błąd', 'Nie udało się odczytać danych z pliku CSV');
         return;
       }
 
@@ -178,7 +178,7 @@ export default function DashboardScreen() {
       }
     } catch (error) {
       console.error('Error importing CSV:', error);
-      Alert.alert('Błąd', 'Wystąpił błąd podczas importu pliku CSV');
+      Alert.alert('Błąd', 'Wystąpiл błąd podczas importu pliku CSV');
     }
   };
 
@@ -282,8 +282,8 @@ export default function DashboardScreen() {
       <View className="flex-row justify-between items-center mb-8">
         <View>
           <Text className="text-3xl font-bold text-foreground">{t.dashboard.title}</Text>
-          {filterProjectId && (
-            <Text className="text-sm text-primary font-medium">Filtrowanie: {projects.find(p => p.id === filterProjectId)?.name}</Text>
+          {activeProjectId && (
+            <Text className="text-sm text-primary font-medium">Filtrowanie: {projects.find(p => p.id === activeProjectId)?.name}</Text>
           )}
         </View>
         <Pressable onPress={() => setSettingsVisible(true)} className="bg-surfaceVariant rounded-full p-2">
@@ -382,15 +382,16 @@ export default function DashboardScreen() {
                 onPress={() => handleProjectPress(item.id)}
                 onLongPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  setFilterProjectId(item.id);
+                  if (activeProjectId === item.id) {
+                    setActiveProjectId(null);
+                  } else {
+                    setActiveProjectId(item.id);
+                  }
                 }}
-                onPressOut={() => {
-                  setFilterProjectId(null);
-                }}
-                delayLongPress={200}
+                delayLongPress={500}
                 className="mb-4"
               >
-                <Card className="p-5">
+                <Card className={`p-5 ${activeProjectId === item.id ? 'border-primary' : ''}`}>
                   <View className="gap-4">
                     <View className="flex-row justify-between items-start">
                       <View className="flex-1">
@@ -408,18 +409,20 @@ export default function DashboardScreen() {
                         )}
                       </View>
                       <View className="flex-row items-center gap-2">
-                        <View className="flex-col gap-1">
-                          {index > 0 && (
-                            <Pressable onPress={() => moveProject(index, 'up')} className="p-1">
-                              <MaterialIcons name="keyboard-arrow-up" size={20} color={colors.muted} />
-                            </Pressable>
-                          )}
-                          {index < projects.length - 1 && (
-                            <Pressable onPress={() => moveProject(index, 'down')} className="p-1">
-                              <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.muted} />
-                            </Pressable>
-                          )}
-                        </View>
+                        {activeProjectId && (
+                          <View className="flex-col gap-1">
+                            {index > 0 && (
+                              <Pressable onPress={() => moveProject(index, 'up')} className="p-1">
+                                <MaterialIcons name="keyboard-arrow-up" size={20} color={colors.muted} />
+                              </Pressable>
+                            )}
+                            {index < projects.length - 1 && (
+                              <Pressable onPress={() => moveProject(index, 'down')} className="p-1">
+                                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.muted} />
+                              </Pressable>
+                            )}
+                          </View>
+                        )}
                         <Pressable onPress={() => handleProjectMenu(item)} className="bg-surfaceVariant/60 rounded-full p-2.5">
                           <MaterialIcons name="more-vert" size={20} color={colors.muted} />
                         </Pressable>
