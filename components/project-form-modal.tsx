@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Modal, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
@@ -63,53 +63,32 @@ export function ProjectFormModal({
     }
 
     try {
-      console.log('Starting CSV import...');
       const result = await DocumentPicker.getDocumentAsync({
         type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel'],
       });
 
-      if (result.canceled) {
-        console.log('Document picker canceled');
-        return;
-      }
+      if (result.canceled) return;
 
       setLoading(true);
       const fileUri = result.assets[0].uri;
-      console.log('File URI:', fileUri);
-      
       const csvText = await FileSystem.readAsStringAsync(fileUri);
-      console.log('CSV text length:', csvText.length);
-      console.log('First 200 chars:', csvText.substring(0, 200));
       
       const rows = parseCSV(csvText);
-      console.log('Parsed rows count:', rows.length);
       if (rows.length === 0) {
         Alert.alert('Błąd', 'Nie udało się odczytać danych z pliku CSV');
         setLoading(false);
         return;
       }
 
-      console.log('Processing CSV data...');
       const newProject = processCSVData(name.trim(), city.trim() || undefined, rows);
-      console.log('New project created with', newProject.addresses.length, 'addresses');
-      
       const projects = await loadData();
       projects.push(newProject);
       await saveData(projects);
 
       Alert.alert('Sukces', `Zaimportowano projekt z ${newProject.addresses.length} adresami`);
-      
-      // We need to notify the parent to refresh
-      // Since we don't have a direct callback, we'll rely on the fact that 
-      // the parent should reload data when it gains focus or when projects change.
       onClose();
-      // We need to trigger a refresh in the parent, but since we're using saveData directly here, 
-      // the parent's useFocusEffect or similar should handle it if it re-renders.
-      // In a real app, we might want a callback like onImportComplete.
     } catch (error) {
       console.error('Error importing CSV:', error);
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
-      console.error('Error message:', error instanceof Error ? error.message : String(error));
       Alert.alert('Błąd', `Wystąpił błąd podczas importu pliku CSV: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setLoading(false);
@@ -123,95 +102,100 @@ export function ProjectFormModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-background pt-12 pb-20">
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-4 py-4 border-b border-border">
-          <Pressable onPress={onClose}>
-            <MaterialIcons name="close" size={24} color={colors.foreground} />
-          </Pressable>
-          <Text className="text-lg font-bold text-foreground">
-            {project ? 'Edytuj projekt' : 'Nowy projekt'}
-          </Text>
-          <Pressable onPress={handleSave} disabled={loading}>
-            <MaterialIcons 
-              name="check" 
-              size={24} 
-              color={loading ? colors.muted : colors.primary} 
-            />
-          </Pressable>
-        </View>
-
-        {/* Form */}
-        <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
-          {/* Project Name */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">
-              {t.forms.name} *
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        className="flex-1 bg-background"
+      >
+        <View className="flex-1 pt-12 pb-4">
+          {/* Header */}
+          <View className="flex-row items-center justify-between px-4 py-4 border-b border-border">
+            <Pressable onPress={onClose}>
+              <MaterialIcons name="close" size={24} color={colors.foreground} />
+            </Pressable>
+            <Text className="text-lg font-bold text-foreground">
+              {project ? 'Edytuj projekt' : 'Nowy projekt'}
             </Text>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder={t.forms.name}
-              placeholderTextColor={colors.muted}
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              editable={!loading}
-            />
+            <Pressable onPress={handleSave} disabled={loading}>
+              <MaterialIcons 
+                name="check" 
+                size={24} 
+                color={loading ? colors.muted : colors.primary} 
+              />
+            </Pressable>
           </View>
 
-          {/* City */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">
-              Miasto
-            </Text>
-            <TextInput
-              value={city}
-              onChangeText={setCity}
-              placeholder="Warszawa"
-              placeholderTextColor={colors.muted}
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              editable={!loading}
-            />
-          </View>
-
-          {!project && (
-            <View className="mt-6">
-              <Text className="text-sm font-semibold text-muted mb-3 uppercase tracking-wider">
-                Opcje zaawansowane
+          {/* Form */}
+          <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+            {/* Project Name */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-2">
+                {t.forms.name} *
               </Text>
-              <Pressable
-                onPress={handleImportCSV}
-                disabled={loading}
-                className="flex-row items-center gap-3 bg-surfaceVariant/40 border border-dashed border-primary/40 rounded-xl p-5"
-              >
-                <View className="bg-primary/10 p-3 rounded-full">
-                  <MaterialIcons name="file-upload" size={24} color={colors.primary} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-base font-bold text-foreground">Importuj z CSV</Text>
-                  <Text className="text-xs text-muted mt-1">
-                    Automatycznie utwórz adresy i dodaj mieszkańców z pliku
-                  </Text>
-                </View>
-              </Pressable>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder={t.forms.name}
+                placeholderTextColor={colors.muted}
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                editable={!loading}
+              />
             </View>
-          )}
-        </ScrollView>
 
-        {/* Save Button */}
-        <View className="border-t border-border p-4">
-          <Pressable
-            onPress={handleSave}
-            disabled={loading}
-            className={`rounded-lg py-3 items-center ${
-              loading ? 'bg-muted' : 'bg-primary'
-            }`}
-          >
-            <Text className="text-white font-semibold">
-              {loading ? t.common.loading : (project ? 'Zapisz zmiany' : 'Utwórz projekt')}
-            </Text>
-          </Pressable>
+            {/* City */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-2">
+                Miasto
+              </Text>
+              <TextInput
+                value={city}
+                onChangeText={setCity}
+                placeholder="Warszawa"
+                placeholderTextColor={colors.muted}
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                editable={!loading}
+              />
+            </View>
+
+            {!project && (
+              <View className="mt-6">
+                <Text className="text-sm font-semibold text-muted mb-3 uppercase tracking-wider">
+                  Opcje zaawansowane
+                </Text>
+                <Pressable
+                  onPress={handleImportCSV}
+                  disabled={loading}
+                  className="flex-row items-center gap-3 bg-surfaceVariant/40 border border-dashed border-primary/40 rounded-xl p-5"
+                >
+                  <View className="bg-primary/10 p-3 rounded-full">
+                    <MaterialIcons name="file-upload" size={24} color={colors.primary} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-base font-bold text-foreground">Importuj z CSV</Text>
+                    <Text className="text-xs text-muted mt-1">
+                      Automatycznie utwórz adresy i dodaj mieszkańców z pliku
+                    </Text>
+                  </View>
+                </Pressable>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Save Button */}
+          <View className="border-t border-border p-4 pb-8">
+            <Pressable
+              onPress={handleSave}
+              disabled={loading}
+              className={`rounded-lg py-3 items-center ${
+                loading ? 'bg-muted' : 'bg-primary'
+              }`}
+            >
+              <Text className="text-white font-semibold">
+                {loading ? t.common.loading : (project ? 'Zapisz zmiany' : 'Utwórz projekt')}
+              </Text>
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

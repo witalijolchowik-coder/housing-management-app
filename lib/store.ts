@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Project, Address, Room, Space, Tenant, SpaceStats, ProjectStats, EvictionArchive, Conflict, ConflictType } from '@/types';
+import { Project, Address, Room, Space, Tenant, SpaceStats, ProjectStats, EvictionArchive, Conflict, ConflictType, AddAddressFormData } from '@/types';
 
 const STORAGE_KEY = 'housing_management_data';
 const EVICTION_ARCHIVE_KEY = 'eviction_archive';
@@ -14,9 +14,6 @@ export const calculateSpaceStats = (spaces: Space[]): SpaceStats => {
   return spaces.reduce(
     (acc, space) => {
       acc.total++;
-      
-      // Zajęte = Razem - Wolne
-      // Wolne = vacant + (wypowiedzenie without tenant)
       
       const isWolne = space.status === 'vacant' || (space.status === 'wypowiedzenie' && !space.tenant);
       
@@ -47,12 +44,10 @@ export const calculateProjectStats = (project: Project): ProjectStats => {
   );
   const stats = calculateSpaceStats(allSpaces);
   
-  // Occupancy = occupied / total (where occupied already includes people on wypowiedzenie)
   const occupancyPercent = stats.total > 0 
     ? Math.round((stats.occupied / stats.total) * 100) 
     : 0;
   
-  // Count conflicts
   const conflicts = getConflicts(project);
   const conflictCount = conflicts.length;
   
@@ -89,7 +84,6 @@ export const getConflicts = (project: Project): Conflict[] => {
   const conflicts: Conflict[] = [];
   
   for (const address of project.addresses) {
-    // Check unassigned tenants
     for (const tenant of address.unassignedTenants || []) {
       conflicts.push({
         id: generateId(),
@@ -107,10 +101,8 @@ export const getConflicts = (project: Project): Conflict[] => {
 
     for (const room of address.rooms) {
       for (const space of room.spaces) {
-        // Skip conflicts for whole addresses if it's just an empty space
         const isWholeAddress = address.isWholeAddress;
 
-        // Type 1: Tenant without room
         if (space.tenant && !space.tenant.spaceId) {
           conflicts.push({
             id: generateId(),
@@ -127,7 +119,6 @@ export const getConflicts = (project: Project): Conflict[] => {
           });
         }
         
-        // Type 2: Tenant on wypowiedzenie with overdue end date
         if (space.tenant && space.status === 'wypowiedzenie' && space.wypowiedzenie) {
           if (isOverdue(space.wypowiedzenie.endDate)) {
             conflicts.push({
@@ -146,11 +137,10 @@ export const getConflicts = (project: Project): Conflict[] => {
           }
         }
 
-        // Type 3: Empty space not on wypowiedzenie (except for whole addresses)
         if (!isWholeAddress && space.status === 'vacant' && !space.tenant) {
           conflicts.push({
             id: generateId(),
-            type: 'no_room', // Reusing type or could add new one
+            type: 'no_room',
             projectId: project.id,
             projectName: project.name,
             addressId: address.id,
@@ -281,12 +271,12 @@ export const deleteProject = async (projectId: string): Promise<void> => {
 };
 
 // CRUD operations for Addresses
-export const addAddress = async (projectId: string, addressData: Omit<Address, 'id' | 'projectId' | 'rooms' | 'status'> & { regularRooms?: number }): Promise<Address> => {
+export const addAddress = async (projectId: string, addressData: AddAddressFormData): Promise<Address> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
 
-  const { regularRooms = 0, ...restAddressData } = addressData;
+  const { regularRooms = 0, coupleRooms = 0, ...restAddressData } = addressData;
   const rooms: Room[] = [];
 
   // Auto-generate regular (empty) rooms
@@ -296,8 +286,8 @@ export const addAddress = async (projectId: string, addressData: Omit<Address, '
       id: roomId,
       addressId: '', // Will be set below
       name: `Pokój ${i + 1}`,
-      type: 'male', // Default to male, can be changed later
-      totalSpaces: 0, // Empty room
+      type: 'male',
+      totalSpaces: 0,
       spaces: [],
       amenities: {
         shower: false,
@@ -310,11 +300,10 @@ export const addAddress = async (projectId: string, addressData: Omit<Address, '
   }
 
   // Auto-generate couple rooms (2 beds each)
-  for (let i = 0; i < addressData.coupleRooms; i++) {
+  for (let i = 0; i < coupleRooms; i++) {
     const roomId = generateId();
     const spaces: Space[] = [];
     
-    // Create 2 spaces for couple room
     for (let j = 0; j < 2; j++) {
       spaces.push({
         id: generateId(),
@@ -322,19 +311,12 @@ export const addAddress = async (projectId: string, addressData: Omit<Address, '
         number: j + 1,
         status: 'vacant',
         tenant: null,
-        amenities: {
-          shower: false,
-          toilet: false,
-          wifi: false,
-          stove: false,
-          fridge: false,
-        },
       });
     }
 
     rooms.push({
       id: roomId,
-      addressId: '', // Will be set below
+      addressId: '',
       name: `Pokój dla par ${i + 1}`,
       type: 'couple',
       totalSpaces: 2,
@@ -355,19 +337,19 @@ export const addAddress = async (projectId: string, addressData: Omit<Address, '
     projectId,
     rooms,
     status: 'active',
+    unassignedTenants: [],
+    photos: [],
   };
 
-  // Set addressId for all rooms
-  newAddress.rooms.forEach(room => {
-    room.addressId = newAddress.id;
-  });
+  // Set addressId in rooms
+  newAddress.rooms.forEach((r) => (r.addressId = newAddress.id));
 
   projects[projectIndex].addresses.push(newAddress);
   await saveData(projects);
   return newAddress;
 };
 
-export const updateAddress = async (projectId: string, addressId: string, updates: Partial<Address> & { regularRooms?: number }): Promise<void> => {
+export const updateAddress = async (projectId: string, addressId: string, updates: AddAddressFormData): Promise<void> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
@@ -375,104 +357,76 @@ export const updateAddress = async (projectId: string, addressId: string, update
   const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
   if (addressIndex === -1) throw new Error('Address not found');
 
-  const address = projects[projectIndex].addresses[addressIndex];
-  const { regularRooms, coupleRooms, ...otherUpdates } = updates;
+  const currentAddress = projects[projectIndex].addresses[addressIndex];
+  
+  // Handle room management
+  const currentRegularRooms = currentAddress.rooms.filter(r => r.type !== 'couple');
+  const currentCoupleRooms = currentAddress.rooms.filter(r => r.type === 'couple');
 
-  // Handle room adjustments if room counts are provided
-  if (regularRooms !== undefined || coupleRooms !== undefined) {
-    const currentRegularRooms = address.rooms.filter(r => r.type !== 'couple');
-    const currentCoupleRooms = address.rooms.filter(r => r.type === 'couple');
-
-    let updatedRooms = [...address.rooms];
-
-    // Adjust regular rooms
-    if (regularRooms !== undefined) {
-      if (regularRooms > currentRegularRooms.length) {
-        // Add missing regular rooms
-        const toAdd = regularRooms - currentRegularRooms.length;
-        for (let i = 0; i < toAdd; i++) {
-          updatedRooms.push({
-            id: generateId(),
-            addressId: address.id,
-            name: `Pokój ${currentRegularRooms.length + i + 1}`,
-            type: 'male', // Default
-            totalSpaces: 0,
-            spaces: [],
-            amenities: { shower: false, toilet: false, wifi: false, stove: false, fridge: false },
-          });
-        }
-      } else if (regularRooms < currentRegularRooms.length) {
-        // Remove extra empty regular rooms
-        let toRemove = currentRegularRooms.length - regularRooms;
-        // Iterate from the end to remove the latest rooms first
-        for (let i = updatedRooms.length - 1; i >= 0 && toRemove > 0; i--) {
-          const room = updatedRooms[i];
-          if (room.type !== 'couple') {
-            const isEmpty = room.spaces.every(s => !s.tenant);
-            if (isEmpty) {
-              updatedRooms.splice(i, 1);
-              toRemove--;
-            }
-          }
-        }
+  // Update regular rooms
+  if (updates.regularRooms > currentRegularRooms.length) {
+    const diff = updates.regularRooms - currentRegularRooms.length;
+    for (let i = 0; i < diff; i++) {
+      currentAddress.rooms.push({
+        id: generateId(),
+        addressId: currentAddress.id,
+        name: `Pokój ${currentRegularRooms.length + i + 1}`,
+        type: 'male',
+        totalSpaces: 0,
+        spaces: [],
+        amenities: { shower: false, toilet: false, wifi: false, stove: false, fridge: false },
+      });
+    }
+  } else if (updates.regularRooms < currentRegularRooms.length) {
+    const diff = currentRegularRooms.length - updates.regularRooms;
+    let removed = 0;
+    for (let i = currentAddress.rooms.length - 1; i >= 0 && removed < diff; i--) {
+      const room = currentAddress.rooms[i];
+      const isEmpty = room.spaces.every(s => !s.tenant);
+      if (room.type !== 'couple' && isEmpty) {
+        currentAddress.rooms.splice(i, 1);
+        removed++;
       }
     }
+  }
 
-    // Adjust couple rooms
-    if (coupleRooms !== undefined) {
-      if (coupleRooms > currentCoupleRooms.length) {
-        // Add missing couple rooms
-        const toAdd = coupleRooms - currentCoupleRooms.length;
-        for (let i = 0; i < toAdd; i++) {
-          const roomId = generateId();
-          const spaces: Space[] = [];
-          for (let j = 0; j < 2; j++) {
-            spaces.push({
-              id: generateId(),
-              roomId,
-              number: j + 1,
-              status: 'vacant',
-              tenant: null,
-              amenities: { shower: false, toilet: false, wifi: false, stove: false, fridge: false },
-            });
-          }
-          updatedRooms.push({
-            id: roomId,
-            addressId: address.id,
-            name: `Pokój dla par ${currentCoupleRooms.length + i + 1}`,
-            type: 'couple',
-            totalSpaces: 2,
-            spaces,
-            amenities: { shower: false, toilet: false, wifi: false, stove: false, fridge: false },
-          });
-        }
-      } else if (coupleRooms < currentCoupleRooms.length) {
-        // Remove extra empty couple rooms
-        let toRemove = currentCoupleRooms.length - coupleRooms;
-        for (let i = updatedRooms.length - 1; i >= 0 && toRemove > 0; i--) {
-          const room = updatedRooms[i];
-          if (room.type === 'couple') {
-            const isEmpty = room.spaces.every(s => !s.tenant);
-            if (isEmpty) {
-              updatedRooms.splice(i, 1);
-              toRemove--;
-            }
-          }
-        }
+  // Update couple rooms
+  if (updates.coupleRooms > currentCoupleRooms.length) {
+    const diff = updates.coupleRooms - currentCoupleRooms.length;
+    for (let i = 0; i < diff; i++) {
+      const roomId = generateId();
+      const spaces: Space[] = [
+        { id: generateId(), roomId, number: 1, status: 'vacant' },
+        { id: generateId(), roomId, number: 2, status: 'vacant' }
+      ];
+      currentAddress.rooms.push({
+        id: roomId,
+        addressId: currentAddress.id,
+        name: `Pokój dla par ${currentCoupleRooms.length + i + 1}`,
+        type: 'couple',
+        totalSpaces: 2,
+        spaces,
+        amenities: { shower: false, toilet: false, wifi: false, stove: false, fridge: false },
+      });
+    }
+  } else if (updates.coupleRooms < currentCoupleRooms.length) {
+    const diff = currentCoupleRooms.length - updates.coupleRooms;
+    let removed = 0;
+    for (let i = currentAddress.rooms.length - 1; i >= 0 && removed < diff; i--) {
+      const room = currentAddress.rooms[i];
+      const isEmpty = room.spaces.every(s => !s.tenant);
+      if (room.type === 'couple' && isEmpty) {
+        currentAddress.rooms.splice(i, 1);
+        removed++;
       }
     }
-
-    address.rooms = updatedRooms;
-    // Update totalSpaces and coupleRooms counts in address object
-    address.coupleRooms = updatedRooms.filter(r => r.type === 'couple').length;
-    address.totalSpaces = updatedRooms.reduce((sum, r) => sum + r.totalSpaces, 0);
   }
 
   projects[projectIndex].addresses[addressIndex] = {
-    ...address,
-    ...otherUpdates,
+    ...currentAddress,
+    ...updates,
   };
-  
+
   await saveData(projects);
 };
 
@@ -480,23 +434,6 @@ export const deleteAddress = async (projectId: string, addressId: string): Promi
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
-
-  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
-  if (addressIndex === -1) throw new Error('Address not found');
-
-  const address = projects[projectIndex].addresses[addressIndex];
-
-  // Check if there are any residents in rooms
-  const hasResidentsInRooms = address.rooms.some(room => 
-    room.spaces.some(space => space.tenant !== null && space.tenant !== undefined)
-  );
-
-  // Check if there are any unassigned residents
-  const hasUnassignedResidents = address.unassignedTenants && address.unassignedTenants.length > 0;
-
-  if (hasResidentsInRooms || hasUnassignedResidents) {
-    throw new Error('HAS_RESIDENTS');
-  }
 
   projects[projectIndex].addresses = projects[projectIndex].addresses.filter((a) => a.id !== addressId);
   await saveData(projects);
@@ -520,7 +457,6 @@ export const putAddressOnWypowiedzenie = async (projectId: string, addressId: st
   address.status = 'wypowiedzenie';
   address.addressWypowiedzienieStart = startDate;
 
-  // Put all non-wypowiedzenie spaces on wypowiedzenie
   for (const room of address.rooms) {
     for (const space of room.spaces) {
       if (space.status !== 'wypowiedzenie') {
@@ -551,12 +487,10 @@ export const removeAddressFromWypowiedzenie = async (projectId: string, addressI
   address.status = 'active';
   address.addressWypowiedzienieStart = undefined;
 
-  // Remove wypowiedzenie only from spaces that were grouped with address
   for (const room of address.rooms) {
     for (const space of room.spaces) {
       if (space.wypowiedzenie?.groupedWithAddress) {
-        space.status = 'vacant';
-        space.tenant = undefined;
+        space.status = space.tenant ? 'occupied' : 'vacant';
         space.wypowiedzenie = undefined;
       }
     }
@@ -599,7 +533,6 @@ export const addRoom = async (
     amenities: roomData.amenities,
   };
 
-  // Update room ID in spaces
   newRoom.spaces = spaces.map((s) => ({ ...s, roomId: newRoom.id }));
 
   projects[projectIndex].addresses[addressIndex].rooms.push(newRoom);
@@ -655,7 +588,6 @@ export const deleteSpace = async (projectId: string, addressId: string, roomId: 
   const spaceIndex = room.spaces.findIndex((s) => s.id === spaceId);
   if (spaceIndex === -1) throw new Error('Space not found');
 
-  // Can only delete vacant spaces
   if (room.spaces[spaceIndex].status !== 'vacant') {
     throw new Error('Can only delete vacant spaces');
   }
@@ -670,7 +602,8 @@ export const putSpaceOnWypowiedzenie = async (
   addressId: string,
   roomId: string,
   spaceId: string,
-  evictionPeriod: number = 14
+  evictionPeriod: number = 14,
+  customStartDate?: string
 ): Promise<void> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
@@ -688,8 +621,8 @@ export const putSpaceOnWypowiedzenie = async (
   if (spaceIndex === -1) throw new Error('Space not found');
 
   const space = projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex];
-  const startDate = new Date().toISOString().split('T')[0];
-  const endDate = new Date();
+  const startDate = customStartDate || new Date().toISOString().split('T')[0];
+  const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + evictionPeriod);
 
   space.status = 'wypowiedzenie';
@@ -748,20 +681,10 @@ export const checkInTenant = async (
   const newTenant: Tenant = {
     ...tenantData,
     id: generateId(),
-    // spaceId is undefined initially
+    monthlyPrice: 0, // Default to 0 as requested
   };
 
-  // Store tenant in a temporary location or in the first space
-  // For now, we'll add to address's first room's first space
-  if (projects[projectIndex].addresses[addressIndex].rooms.length > 0) {
-    const firstRoom = projects[projectIndex].addresses[addressIndex].rooms[0];
-    if (firstRoom.spaces.length > 0) {
-      const firstSpace = firstRoom.spaces[0];
-      newTenant.spaceId = firstSpace.id;
-      firstSpace.tenant = newTenant;
-      firstSpace.status = 'occupied';
-    }
-  }
+  projects[projectIndex].addresses[addressIndex].unassignedTenants.push(newTenant);
 
   await saveData(projects);
   return newTenant;
@@ -782,51 +705,70 @@ export const assignTenantToSpace = async (
   if (addressIndex === -1) throw new Error('Address not found');
 
   const address = projects[projectIndex].addresses[addressIndex];
+  
+  // Find tenant (either in unassigned or in some space)
   let tenant: Tenant | undefined;
-  let targetRoom: Room | undefined;
+  let oldSpace: Space | undefined;
 
-  // Find tenant and remove from old space
-  for (const room of address.rooms) {
-    for (const space of room.spaces) {
-      if (space.tenant?.id === tenantId) {
-        tenant = space.tenant;
-        space.tenant = undefined;
-        space.status = 'vacant';
-        break;
+  const unassignedIndex = address.unassignedTenants.findIndex(t => t.id === tenantId);
+  if (unassignedIndex !== -1) {
+    tenant = address.unassignedTenants[unassignedIndex];
+    address.unassignedTenants.splice(unassignedIndex, 1);
+  } else {
+    for (const room of address.rooms) {
+      for (const space of room.spaces) {
+        if (space.tenant?.id === tenantId) {
+          tenant = space.tenant;
+          oldSpace = space;
+          space.tenant = null;
+          space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
+          break;
+        }
       }
+      if (tenant) break;
     }
-    if (tenant) break;
   }
 
   if (!tenant) throw new Error('Tenant not found');
 
-  // Assign to new space
+  // Find new space
+  let newSpace: Space | undefined;
+  let newRoom: Room | undefined;
   for (const room of address.rooms) {
     for (const space of room.spaces) {
       if (space.id === newSpaceId) {
-        targetRoom = room;
-        tenant.spaceId = newSpaceId;
-        
-        // Calculate price based on room type
-        const mediaFee = address.mediaFee || 0;
-        if (room.type === 'couple') {
-          tenant.monthlyPrice = (address.couplePrice || 0) + mediaFee;
-        } else {
-          tenant.monthlyPrice = (address.pricePerSpace || 0) + mediaFee;
-        }
-
-        space.tenant = tenant;
-        space.status = 'occupied';
+        newSpace = space;
+        newRoom = room;
         break;
       }
     }
+    if (newSpace) break;
+  }
+
+  if (!newSpace || !newRoom) throw new Error('New space not found');
+
+  // Assign tenant and update price
+  tenant.spaceId = newSpace.id;
+  newSpace.tenant = tenant;
+  newSpace.status = 'occupied';
+
+  // Update price based on room type
+  const mediaFee = address.mediaFee || 450;
+  if (newRoom.type === 'couple') {
+    tenant.monthlyPrice = (address.couplePrice || 0) + mediaFee;
+  } else {
+    tenant.monthlyPrice = (address.pricePerSpace || 0) + mediaFee;
   }
 
   await saveData(projects);
 };
 
-// Apply prices to all tenants in an address
-export const applyPricesToAll = async (projectId: string, addressId: string, currentFormData?: any): Promise<void> => {
+// Remove tenant from space (to unassigned)
+export const removeTenantFromSpace = async (
+  projectId: string,
+  addressId: string,
+  tenantId: string
+): Promise<void> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
@@ -836,43 +778,33 @@ export const applyPricesToAll = async (projectId: string, addressId: string, cur
 
   const address = projects[projectIndex].addresses[addressIndex];
   
-  // Use current form data if provided, otherwise use saved address data
-  const mediaFee = currentFormData ? Number(currentFormData.mediaFee) : (address.mediaFee || 0);
-  const pricePerSpace = currentFormData ? Number(currentFormData.pricePerSpace) : (address.pricePerSpace || 0);
-  const couplePrice = currentFormData ? Number(currentFormData.couplePrice) : (address.couplePrice || 0);
-
+  let tenant: Tenant | undefined;
   for (const room of address.rooms) {
     for (const space of room.spaces) {
-      if (space.tenant) {
-        if (room.type === 'couple') {
-          space.tenant.monthlyPrice = couplePrice + mediaFee;
-        } else {
-          space.tenant.monthlyPrice = pricePerSpace + mediaFee;
-        }
+      if (space.tenant?.id === tenantId) {
+        tenant = space.tenant;
+        space.tenant = null;
+        space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
+        break;
       }
     }
+    if (tenant) break;
   }
 
-  // Also update the address itself if form data is provided
-  if (currentFormData) {
-    projects[projectIndex].addresses[addressIndex] = {
-      ...address,
-      ...currentFormData,
-      mediaFee,
-      pricePerSpace,
-      couplePrice
-    };
+  if (tenant) {
+    tenant.spaceId = undefined;
+    tenant.monthlyPrice = 0; // Reset price when unassigned
+    address.unassignedTenants.push(tenant);
+    await saveData(projects);
   }
-
-  await saveData(projects);
 };
 
-// Check-out tenant (eviction)
-export const checkOutTenant = async (
+// Evict tenant (to archive)
+export const evictTenant = async (
   projectId: string,
   addressId: string,
   tenantId: string,
-  checkoutDate: string,
+  checkOutDate: string,
   reason: any
 ): Promise<void> => {
   const projects = await loadData();
@@ -883,241 +815,86 @@ export const checkOutTenant = async (
   if (addressIndex === -1) throw new Error('Address not found');
 
   const address = projects[projectIndex].addresses[addressIndex];
+  
   let tenant: Tenant | undefined;
-  let spaceId: string | undefined;
   let roomName: string | undefined;
 
-  // Find and remove tenant
-  for (const room of address.rooms) {
-    for (const space of room.spaces) {
-      if (space.tenant?.id === tenantId) {
-        tenant = space.tenant;
-        spaceId = space.id;
-        roomName = room.name;
-        space.tenant = undefined;
-        space.status = 'vacant';
-        break;
+  // Check unassigned
+  const unassignedIndex = address.unassignedTenants.findIndex(t => t.id === tenantId);
+  if (unassignedIndex !== -1) {
+    tenant = address.unassignedTenants[unassignedIndex];
+    address.unassignedTenants.splice(unassignedIndex, 1);
+  } else {
+    for (const room of address.rooms) {
+      for (const space of room.spaces) {
+        if (space.tenant?.id === tenantId) {
+          tenant = space.tenant;
+          roomName = room.name;
+          space.tenant = null;
+          space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
+          break;
+        }
       }
+      if (tenant) break;
     }
-    if (tenant) break;
   }
 
-  if (!tenant) throw new Error('Tenant not found');
+  if (tenant) {
+    await addToEvictionArchive(
+      tenant,
+      projectId,
+      projects[projectIndex].name,
+      addressId,
+      address.name,
+      roomName,
+      checkOutDate,
+      reason
+    );
+    await saveData(projects);
+  }
+};
 
-  // Add to eviction archive
-  await addToEvictionArchive(tenant, projectId, projects[projectIndex].name, addressId, address.name, roomName, checkoutDate, reason);
+export const applyPricesToAll = async (projectId: string, addressId: string, prices: { pricePerSpace: number, couplePrice: number, mediaFee: number }): Promise<void> => {
+  const projects = await loadData();
+  const projectIndex = projects.findIndex((p) => p.id === projectId);
+  if (projectIndex === -1) throw new Error('Project not found');
+
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
+
+  const address = projects[projectIndex].addresses[addressIndex];
+  
+  // Update address settings
+  address.pricePerSpace = prices.pricePerSpace;
+  address.couplePrice = prices.couplePrice;
+  address.mediaFee = prices.mediaFee;
+
+  // Update all tenants on this address
+  for (const room of address.rooms) {
+    const basePrice = room.type === 'couple' ? prices.couplePrice : prices.pricePerSpace;
+    const totalPrice = basePrice + prices.mediaFee;
+    
+    for (const space of room.spaces) {
+      if (space.tenant) {
+        space.tenant.monthlyPrice = totalPrice;
+      }
+    }
+  }
+
+  // Unassigned tenants get 0
+  for (const tenant of address.unassignedTenants) {
+    tenant.monthlyPrice = 0;
+  }
 
   await saveData(projects);
 };
 
-// Get tenant history (all addresses where tenant lived)
-export const getTenantHistory = async (projectId: string, tenantId: string): Promise<any[]> => {
-  const projects = await loadData();
-  const project = projects.find((p) => p.id === projectId);
-  if (!project) return [];
-
-  const history: any[] = [];
-
-  // Check current addresses
-  for (const address of project.addresses) {
-    for (const room of address.rooms) {
-      for (const space of room.spaces) {
-        if (space.tenant?.id === tenantId) {
-          history.push({
-            addressName: address.name,
-            checkInDate: space.tenant.checkInDate,
-            checkOutDate: null,
-            status: 'active',
-          });
-        }
-      }
-    }
-  }
-
-  // Check eviction archive
-  const archive = await loadEvictionArchive();
-  const archivedEntries = archive.filter((e) => e.tenantId === tenantId);
-  for (const entry of archivedEntries) {
-    history.push({
-      addressName: entry.addressName,
-      checkInDate: entry.checkInDate,
-      checkOutDate: entry.checkOutDate,
-      status: 'archived',
-      reason: entry.reason,
-    });
-  }
-
-  // Sort by date (newest first)
-  history.sort((a, b) => new Date(b.checkInDate).getTime() - new Date(a.checkInDate).getTime());
-
-  return history;
-};
-
-// Get demo data for initial setup
-export const initializeDemoData = async (): Promise<void> => {
-  const existingData = await loadData();
-  if (existingData.length > 0) return;
-
-  const demoProjects: Project[] = [
-    {
-      id: generateId(),
-      name: 'Project Alpha',
-      city: 'Warszawa',
-      addresses: [
-        {
-          id: generateId(),
-          projectId: '',
-          name: 'Akademik Centrum',
-          fullAddress: 'ul. Centralna 15',
-          totalSpaces: 20,
-          coupleRooms: 2,
-          companyName: 'E-Port',
-          ownerName: 'Jan Kowalski',
-          phone: '+48 123 456 789',
-          evictionPeriod: 14,
-          totalCost: 10000,
-          pricePerSpace: 500,
-          couplePrice: 800,
-          photos: [],
-          operator: 'e_port',
-          unassignedTenants: [],
-          rooms: [
-            {
-              id: generateId(),
-              addressId: '',
-              name: '101',
-              type: 'male',
-              totalSpaces: 4,
-              spaces: [
-                { id: generateId(), roomId: '', number: 1, status: 'occupied', tenant: { id: generateId(), firstName: 'Anna', lastName: 'Petrov', gender: 'female', birthYear: 1990, checkInDate: '2024-01-15', spaceId: '', monthlyPrice: 500 } },
-                { id: generateId(), roomId: '', number: 2, status: 'occupied', tenant: { id: generateId(), firstName: 'Maria', lastName: 'Sidorova', gender: 'female', birthYear: 1985, checkInDate: '2024-02-01', spaceId: '', monthlyPrice: 500 } },
-                { id: generateId(), roomId: '', number: 3, status: 'wypowiedzenie', wypowiedzenie: { startDate: '2024-12-20', endDate: '2025-01-03', paidUntil: '2025-01-03' } },
-                { id: generateId(), roomId: '', number: 4, status: 'vacant' },
-              ],
-            },
-            {
-              id: generateId(),
-              addressId: '',
-              name: '102',
-              type: 'female',
-              totalSpaces: 4,
-              spaces: [
-                { id: generateId(), roomId: '', number: 1, status: 'occupied', tenant: { id: generateId(), firstName: 'Petr', lastName: 'Ivanov', gender: 'male', birthYear: 1988, checkInDate: '2024-03-10', spaceId: '', monthlyPrice: 500 } },
-                { id: generateId(), roomId: '', number: 2, status: 'vacant' },
-                { id: generateId(), roomId: '', number: 3, status: 'vacant' },
-                { id: generateId(), roomId: '', number: 4, status: 'occupied', tenant: { id: generateId(), firstName: 'Oleg', lastName: 'Kozlov', gender: 'male', birthYear: 1992, checkInDate: '2024-11-01', spaceId: '', monthlyPrice: 500 } },
-              ],
-            },
-          ],
-          status: 'active',
-        },
-      ],
-    },
-    {
-      id: generateId(),
-      name: 'Project Beta',
-      city: 'Kraków',
-      addresses: [
-        {
-          id: generateId(),
-          projectId: '',
-          name: 'Mieszkanie Centrum',
-          fullAddress: 'ul. Floriańska 20',
-          totalSpaces: 8,
-          coupleRooms: 0,
-          companyName: 'Rent Planet',
-          ownerName: 'Maria Nowak',
-          phone: '+48 987 654 321',
-          evictionPeriod: 14,
-          totalCost: 4000,
-          pricePerSpace: 500,
-          photos: [],
-          operator: 'rent_planet',
-          unassignedTenants: [],
-          rooms: [],
-        },
-      ],
-    },
-    {
-      id: generateId(),
-      name: 'Project Gamma',
-      city: 'Gdańsk',
-      addresses: [
-        {
-          id: generateId(),
-          projectId: '',
-          name: 'Dom Port',
-          fullAddress: 'ul. Długa 10',
-          totalSpaces: 12,
-          coupleRooms: 1,
-          companyName: 'E-Port',
-          ownerName: 'Piotr Kowalczyk',
-          phone: '+48 555 123 456',
-          evictionPeriod: 14,
-          totalCost: 6000,
-          pricePerSpace: 500,
-          photos: [],
-          operator: 'e_port',
-          unassignedTenants: [],
-          rooms: [],
-        },
-        {
-          id: generateId(),
-          projectId: '',
-          name: 'Apartament Stare Miasto',
-          fullAddress: 'ul. Mariacka 5',
-          totalSpaces: 6,
-          coupleRooms: 0,
-          companyName: 'Rent Planet',
-          ownerName: 'Anna Wiśniewska',
-          phone: '+48 666 789 012',
-          evictionPeriod: 14,
-          totalCost: 3000,
-          pricePerSpace: 500,
-          photos: [],
-          operator: 'rent_planet',
-          unassignedTenants: [],
-          rooms: [],
-        },
-      ],
-    },
-    {
-      id: generateId(),
-      name: 'Project Delta',
-      city: 'Wrocław',
-      addresses: [],
-    },
-  ];
-
-  // Fix references
-  for (const project of demoProjects) {
-    for (const address of project.addresses) {
-      address.projectId = project.id;
-      for (const room of address.rooms) {
-        room.addressId = address.id;
-        for (const space of room.spaces) {
-          space.roomId = room.id;
-          if (space.tenant) {
-            space.tenant.spaceId = space.id;
-          }
-        }
-      }
-    }
-  }
-
-  await saveData(demoProjects);
-};
-
-/**
- * Restore tenant from eviction archive to a project address
- */
 export const restoreTenantFromArchive = async (
   archiveEntryId: string,
   projectId: string,
   addressId: string
 ): Promise<void> => {
   try {
-    // Load archive and find entry
     const archive = await loadEvictionArchive();
     const entryIndex = archive.findIndex(e => e.id === archiveEntryId);
     
@@ -1126,8 +903,6 @@ export const restoreTenantFromArchive = async (
     }
     
     const entry = archive[entryIndex];
-    
-    // Load projects and find target address
     const projects = await loadData();
     const projectIndex = projects.findIndex(p => p.id === projectId);
     
@@ -1141,26 +916,21 @@ export const restoreTenantFromArchive = async (
       throw new Error('Address not found');
     }
     
-    // Create tenant object from archive entry
     const restoredTenant: Tenant = {
-      id: generateId(), // New ID for restored tenant
+      id: generateId(),
       firstName: entry.firstName,
       lastName: entry.lastName,
       gender: entry.gender,
       birthYear: entry.birthYear,
-      checkInDate: new Date().toISOString().split('T')[0], // Today's date
+      checkInDate: new Date().toISOString().split('T')[0],
       workStartDate: undefined,
-      monthlyPrice: entry.monthlyPrice || projects[projectIndex].addresses[addressIndex].pricePerSpace || 0,
+      monthlyPrice: 0, // Restored as unassigned initially
       phone: entry.phone,
     };
     
-    // Add to unassignedTenants
     projects[projectIndex].addresses[addressIndex].unassignedTenants.push(restoredTenant);
-    
-    // Save updated projects
     await saveData(projects);
     
-    // Remove from archive
     archive.splice(entryIndex, 1);
     await saveEvictionArchive(archive);
   } catch (error) {

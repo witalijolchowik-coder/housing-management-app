@@ -7,7 +7,8 @@ import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { loadData } from '@/lib/store';
 import { Project, Address } from '@/types';
-import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
+import { GenderIcon } from '@/components/ui/gender-icon';
 
 interface AddressWithProject extends Address {
   projectName: string;
@@ -43,7 +44,7 @@ export default function AllAddressesScreen() {
         });
       });
 
-      // Group by city
+      // Group by city and sort alphabetically
       const grouped = all.reduce((acc, addr) => {
         const city = addr.city || 'Inne';
         if (!acc[city]) acc[city] = [];
@@ -67,7 +68,7 @@ export default function AllAddressesScreen() {
     address.rooms.forEach(room => {
       room.spaces.forEach(space => {
         if (space.tenant) {
-          if (room.type === 'pair') {
+          if (room.type === 'couple') {
             pairs++;
           } else if (space.tenant.gender === 'male') {
             male++;
@@ -147,18 +148,9 @@ export default function AllAddressesScreen() {
                       </View>
 
                       <View className="flex-row items-center gap-4 mt-2 pt-2 border-t border-border/20">
-                        <View className="flex-row items-center gap-1.5">
-                          <FontAwesome5 name="mars" size={14} color="#3b82f6" />
-                          <Text className="text-sm font-bold text-foreground">{stats.male}</Text>
-                        </View>
-                        <View className="flex-row items-center gap-1.5">
-                          <FontAwesome5 name="venus" size={14} color="#ec4899" />
-                          <Text className="text-sm font-bold text-foreground">{stats.female}</Text>
-                        </View>
-                        <View className="flex-row items-center gap-1.5">
-                          <FontAwesome5 name="user-friends" size={14} color="#a855f7" />
-                          <Text className="text-sm font-bold text-foreground">{stats.pairs}</Text>
-                        </View>
+                        <GenderIcon gender="male" count={stats.male} size={14} />
+                        <GenderIcon gender="female" count={stats.female} size={14} />
+                        <GenderIcon gender="couple" count={stats.pairs} size={14} />
                       </View>
                     </Card>
                   </Pressable>

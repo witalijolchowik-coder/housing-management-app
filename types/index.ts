@@ -85,6 +85,9 @@ export interface Address {
   id: string;
   projectId: string;
   name: string;
+  street: string;
+  city: string;
+  zipCode: string;
   fullAddress: string;
   totalSpaces: number;
   coupleRooms: number;
@@ -160,6 +163,9 @@ export interface AddTenantFormData {
 
 export interface AddAddressFormData {
   name: string;
+  street: string;
+  city: string;
+  zipCode: string;
   fullAddress: string;
   totalSpaces: number;
   regularRooms: number; // Number of regular (empty) rooms to create
