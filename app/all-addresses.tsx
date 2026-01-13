@@ -63,23 +63,29 @@ export default function AllAddressesScreen() {
   const getOccupancyStats = (address: Address) => {
     let male = 0;
     let female = 0;
-    let pairs = 0;
+    let couples = 0; // Changed from 'pairs' to 'couples' for clarity
 
     address.rooms.forEach(room => {
-      room.spaces.forEach(space => {
-        if (space.tenant) {
-          if (room.type === 'couple') {
-            pairs++;
-          } else if (space.tenant.gender === 'male') {
-            male++;
-          } else {
-            female++;
-          }
+      if (room.type === 'couple') {
+        // A couple room counts as one couple if both spaces are occupied
+        const occupiedSpacesInCoupleRoom = room.spaces.filter(space => space.tenant).length;
+        if (occupiedSpacesInCoupleRoom === room.totalSpaces && room.totalSpaces > 0) {
+          couples++;
         }
-      });
+      } else {
+        room.spaces.forEach(space => {
+          if (space.tenant) {
+            if (space.tenant.gender === 'male') {
+              male++;
+            } else {
+              female++;
+            }
+          }
+        });
+      }
     });
 
-    return { male, female, pairs };
+    return { male, female, couples };
   };
 
   const sortedCities = Object.keys(groupedAddresses).sort((a, b) => a.localeCompare(b));
@@ -148,9 +154,9 @@ export default function AllAddressesScreen() {
                       </View>
 
                       <View className="flex-row items-center gap-4 mt-2 pt-2 border-t border-border/20">
-                        <GenderIcon gender="male" count={stats.male} size={14} />
-                        <GenderIcon gender="female" count={stats.female} size={14} />
-                        <GenderIcon gender="couple" count={stats.pairs} size={14} />
+                        <GenderIcon gender="male" count={stats.male} size={14} showCount={true} />
+                        <GenderIcon gender="female" count={stats.female} size={14} showCount={true} />
+                        <GenderIcon gender="couple" count={stats.couples} size={14} showCount={true} />
                       </View>
                     </Card>
                   </Pressable>

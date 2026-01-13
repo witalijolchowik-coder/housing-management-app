@@ -9,10 +9,11 @@ import { OccupancyProgress } from '@/components/ui/occupancy-progress';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Address, Room, Tenant, Project, EvictionFormData, Space } from '@/types';
-import { loadData, calculateRoomStats, getDaysRemaining, saveData, evictTenant } from '@/lib/store';
+import { loadData, calculateRoomStats, getDaysRemaining, saveData, evictTenant, updateSpaceWypowiedzenieStartDate } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 import { EvictionFormModal } from '@/components/eviction-form-modal';
 import { GenderIcon } from '@/components/ui/gender-icon';
+import { DatePicker } from '@/components/ui/date-picker';
 
 export default function AddressDetailsScreen() {
   const t = useTranslations();
@@ -28,6 +29,9 @@ export default function AddressDetailsScreen() {
   const [selectedRoom, setSelectedRoom] = useState<Room | undefined>(undefined);
   const [evictionModalVisible, setEvictionModalVisible] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
+  const [changeWypowiedzenieDateModalVisible, setChangeWypowiedzenieDateModalVisible] = useState(false);
+  const [newWypowiedzenieStartDate, setNewWypowiedzenieStartDate] = useState('');
+  const [selectedSpaceForWypowiedzenie, setSelectedSpaceForWypowiedzenie] = useState<Space | null>(null);
 
   useEffect(() => {
     loadAddress();
@@ -159,6 +163,28 @@ export default function AddressDetailsScreen() {
     }
   };
 
+  const handleChangeWypowiedzenieDate = async () => {
+    if (!selectedRoom || !selectedSpaceForWypowiedzenie || !newWypowiedzenieStartDate) return;
+    try {
+      await updateSpaceWypowiedzenieStartDate(
+        projectId as string,
+        addressId as string,
+        selectedRoom.id,
+        selectedSpaceForWypowiedzenie.id,
+        newWypowiedzenieStartDate
+      );
+      Alert.alert('Sukces', 'Data wypowiedzenia została zaktualizowana.');
+      setChangeWypowiedzenieDateModalVisible(false);
+      setNewWypowiedzenieStartDate('');
+      setSelectedSpaceForWypowiedzenie(null);
+      setRoomMenuVisible(false);
+      await loadAddress();
+    } catch (error) {
+      console.error('Error updating wypowiedzenie date:', error);
+      Alert.alert('Błąd', 'Nie udało się zaktualizować daty wypowiedzenia.');
+    }
+  };
+
   const renderResidentCard = ({ item }: { item: Tenant }) => {
     const spaceInfo = getTenantSpace(item.id);
     const isOnWypowiedzenie = spaceInfo?.space.status === 'wypowiedzenie';
@@ -191,7 +217,7 @@ export default function AddressDetailsScreen() {
                 <Text className="font-semibold text-foreground">
                   {item.firstName} {item.lastName} <Text className="text-muted">({item.birthYear})</Text>
                 </Text>
-                <GenderIcon gender={item.gender as any} showCount={false} size={14} />
+
               </View>
               <View className="flex-row items-center gap-2">
                 <Text className="text-xs text-muted">{item.checkInDate}</Text>
@@ -248,7 +274,7 @@ export default function AddressDetailsScreen() {
                   <Text className="text-lg font-bold text-foreground mb-0.5">
                     {item.name}
                   </Text>
-                  <GenderIcon gender={item.type as any} showCount={false} size={14} />
+
                 </View>
                 <Pressable
                   onPress={() => {
@@ -473,6 +499,25 @@ export default function AddressDetailsScreen() {
               <Text className="text-foreground font-medium">{t.common.edit}</Text>
             </Pressable>
 
+            {selectedRoom?.spaces.some(s => s.wypowiedzenie) && (
+              <Pressable
+                onPress={() => {
+                  setRoomMenuVisible(false);
+                  // Find the first space in the room that is on wypowiedzenie
+                  const spaceOnWypowiedzenie = selectedRoom?.spaces.find(s => s.wypowiedzenie);
+                  if (spaceOnWypowiedzenie) {
+                    setSelectedSpaceForWypowiedzenie(spaceOnWypowiedzenie);
+                    setNewWypowiedzenieStartDate(spaceOnWypowiedzenie.wypowiedzenie?.startDate || '');
+                    setChangeWypowiedzenieDateModalVisible(true);
+                  }
+                }}
+                className="flex-row items-center justify-center gap-3 py-3 bg-surfaceVariant rounded-xl"
+              >
+                <MaterialIcons name="calendar-today" size={24} color={colors.primary} />
+                <Text className="text-foreground font-medium">Zmień datę wypowiedzenia</Text>
+              </Pressable>
+            )}
+
             <Pressable
               onPress={() => {
                 if (selectedRoom) {
@@ -500,6 +545,39 @@ export default function AddressDetailsScreen() {
         onClose={() => setEvictionModalVisible(false)}
         onSave={handleEvictTenant}
       />
+
+      {/* Change Wypowiedzenie Date Modal */}
+      <Modal
+        visible={changeWypowiedzenieDateModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setChangeWypowiedzenieDateModalVisible(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/50 justify-center items-center p-4"
+          onPress={() => setChangeWypowiedzenieDateModalVisible(false)}
+        >
+          <View className="bg-surface w-full max-w-sm p-6 rounded-2xl gap-4">
+            <Text className="text-lg font-bold text-foreground text-center mb-2">
+              Zmień datę wypowiedzenia
+            </Text>
+            <Text className="text-sm font-semibold text-foreground mb-2">
+              Nowa data rozpoczęcia wypowiedzenia
+            </Text>
+            <DatePicker
+              value={newWypowiedzenieStartDate}
+              onChange={setNewWypowiedzenieStartDate}
+              placeholder="Wybierz datę"
+            />
+            <Pressable
+              onPress={handleChangeWypowiedzenieDate}
+              className="bg-primary py-3 rounded-xl items-center mt-4"
+            >
+              <Text className="text-white font-semibold">Zapisz</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
