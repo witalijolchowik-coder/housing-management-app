@@ -471,19 +471,7 @@ export default function AddressDetailsScreen() {
               {selectedRoom?.name}
             </Text>
             
-            <Pressable
-              onPress={() => {
-                setRoomMenuVisible(false);
-                router.push({
-                  pathname: '/room-details',
-                  params: { projectId, addressId, roomId: selectedRoom?.id },
-                });
-              }}
-              className="flex-row items-center justify-center gap-3 py-3 bg-surfaceVariant rounded-xl"
-            >
-              <MaterialIcons name="meeting-room" size={24} color={colors.primary} />
-              <Text className="text-foreground font-medium">{t.common.details}</Text>
-            </Pressable>
+
 
             <Pressable
               onPress={() => {

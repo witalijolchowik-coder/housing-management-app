@@ -1,4 +1,5 @@
 import { View, Text, ScrollView, Pressable } from 'react-native';
+import { Badge } from '@/components/ui/badge';
 import { useState, useCallback } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
@@ -90,13 +91,11 @@ export default function AllAddressesScreen() {
 
   const sortedCities = Object.keys(groupedAddresses).sort((a, b) => a.localeCompare(b));
 
-  const getOperatorLabel = (operator?: string) => {
-    switch (operator) {
-      case 'rent_planet': return 'Rent Planet';
-      case 'e_port': return 'E-Port';
-      case 'other': return 'Inne';
-      default: return operator || '-';
-    }
+  const getOperatorLabel = (operator?: string, operatorName?: string) => {
+    if (operator === 'rent_planet') return 'Rent Planet';
+    if (operator === 'e_port') return 'E-Port';
+    if (operator === 'other' && operatorName) return operatorName;
+    return '-';
   };
 
   return (
@@ -148,9 +147,12 @@ export default function AllAddressesScreen() {
                             Projekt: <Text className="text-foreground/70">{address.projectName}</Text>
                           </Text>
                         </View>
-                        <View className="px-2 py-0.5 rounded-full border border-border/50 bg-surfaceVariant/30">
-                          <Text className="text-[10px] font-medium text-muted-foreground">{getOperatorLabel(address.operator)}</Text>
-                        </View>
+                        {address.operator && address.operator !== 'other' && (
+                          <Badge variant="outline" size="sm" label={getOperatorLabel(address.operator)} className="border-primary text-primary" />
+                        )}
+                        {address.operator === 'other' && address.operatorName && (
+                          <Badge variant="outline" size="sm" label={getOperatorLabel(address.operator, address.operatorName)} className="border-primary text-primary" />
+                        )}
                       </View>
 
                       <View className="flex-row items-center gap-4 mt-2 pt-2 border-t border-border/20">

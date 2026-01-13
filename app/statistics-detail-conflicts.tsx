@@ -122,7 +122,15 @@ export default function ConflictsDetailScreen() {
                 {expandedProject === project.id && (
                   <View className="ml-2 gap-2">
                     {projectConflicts.map((conflict, idx) => (
-                      <Card key={idx} className="p-3 bg-surfaceVariant/30">
+                      <Pressable
+                        key={idx}
+                        onPress={() => router.push({
+                          pathname: 
+'/address-details',
+                          params: { projectId: conflict.projectId, addressId: conflict.addressId },
+                        })}
+                      >
+                        <Card className="p-3 bg-surfaceVariant/30">
                         <View className="gap-2">
                           {/* Address */}
                           <View className="flex-row items-center gap-2">
@@ -161,6 +169,7 @@ export default function ConflictsDetailScreen() {
                           />
                         </View>
                       </Card>
+                      </Pressable>
                     ))}
                   </View>
                 )}

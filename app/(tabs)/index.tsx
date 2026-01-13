@@ -400,10 +400,7 @@ export default function DashboardScreen() {
                           <View className="flex-row flex-wrap items-center gap-2 mt-1">
                             <Text className="text-sm text-muted">{item.city}</Text>
                             {operatorList.length > 0 && operatorList.map((operator) => (
-                              <View key={operator} className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/50">
-                                <MaterialIcons name="business" size={12} color={colors.muted} />
-                                <Text className="text-xs text-muted">{getOperatorLabel(operator)}</Text>
-                              </View>
+                               <Badge key={operator} variant="outline" size="sm" label={getOperatorLabel(operator)} className="border-primary text-primary" />
                             ))}
                           </View>
                         )}

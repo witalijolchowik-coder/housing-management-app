@@ -8,14 +8,14 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Address, Room, Space } from '@/types';
-import { loadData, getDaysRemaining, saveData } from '@/lib/store';
+import { loadData, getDaysRemaining, saveData, addSpace, removeSpace, updateAddressTotalSpaces } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export default function RoomDetailsScreen() {
   const t = useTranslations();
   const colors = useColors();
   const router = useRouter();
-  const { projectId, addressId, roomId } = useLocalSearchParams();
+  const { projectId, addressId, roomId } = useLocalSearchParams<{ projectId: string; addressId: string; roomId: string }>();
   const [room, setRoom] = useState<Room | null>(null);
   const [address, setAddress] = useState<Address | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,77 +99,66 @@ export default function RoomDetailsScreen() {
     }
   };
 
+  const handleAddSpace = async () => {
+    try {
+      await addSpace(projectId, addressId, roomId);
+      await loadRoom();
+    } catch (error: any) {
+      if (error.message.includes('Przekroczono limit miejsc w adresie')) {
+        Alert.alert(
+          'Limit miejsc w adresie',
+          'Przekroczono limit miejsc dostępnych na adresie. Czy chcesz zwiększyć limit miejsc w ustawieniach adresu?',
+          [
+            { text: 'Anuluj', style: 'cancel' },
+            { text: 'Zwiększ limit', onPress: async () => {
+                if (address) {
+                  await updateAddressTotalSpaces(projectId, addressId, address.totalSpaces + 1);
+                  await addSpace(projectId, addressId, roomId);
+                  await loadRoom();
+                }
+              }
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Błąd', error.message);
+      }
+    }
+  };
+
+  const handleRemoveSpace = async (spaceId: string) => {
+    try {
+      await removeSpace(projectId, addressId, roomId, spaceId);
+      await loadRoom();
+    } catch (error: any) {
+      Alert.alert('Błąd', error.message);
+    }
+  };
+
   const handleDeleteSpace = async (space: Space) => {
     setSpaceMenuVisible(false);
     
     if (space.tenant) {
-      // Space is occupied - cannot delete without eviction
       Alert.alert(
         'Miejsce zajęte',
         'Miejsce jest zajęte. Zwolnij to miejsce i spróbuj ponownie usunąć.',
         [
-          {
-            text: 'Anuluj',
-            onPress: () => {},
-            style: 'cancel',
-          },
-          {
-            text: 'Postaw na wypowiedzenie',
-            onPress: () => {
-              if (selectedSpace) {
-                handleToggleWypowiedzenie(selectedSpace, true);
-              }
-            },
-          },
+          { text: 'Anuluj', style: 'cancel' },
+          { text: 'Postaw na wypowiedzenie', onPress: () => handleToggleWypowiedzenie(space, true) },
         ]
       );
     } else {
-      // Space is empty - offer choice
       Alert.alert(
         'Usunąć miejsce',
         'Czy chcesz usunąć to miejsce lub postawić je na wypowiedzenie?',
         [
-          {
-            text: 'Anuluj',
-            onPress: () => {},
-            style: 'cancel',
-          },
-          {
-            text: 'Postaw na wypowiedzenie',
-            onPress: () => {
-              if (selectedSpace) {
-                handleToggleWypowiedzenie(selectedSpace, true);
-              }
-            },
-          },
-          {
-            text: 'Usuń',
-            onPress: async () => {
-              try {
-                const projects = await loadData();
-                const project = projects.find((p) => p.id === projectId);
-                if (project) {
-                  const addr = project.addresses.find((a) => a.id === addressId);
-                  if (addr) {
-                    const r = addr.rooms.find((rm) => rm.id === roomId);
-                    if (r) {
-                      r.spaces = r.spaces.filter((s) => s.id !== space.id);
-                      await saveData(projects);
-                      await loadRoom();
-                      setSelectedSpace(undefined);
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error('Error deleting space:', error);
-              }
-            },
-            style: 'destructive',
-          },
+          { text: 'Anuluj', style: 'cancel' },
+          { text: 'Postaw na wypowiedzenie', onPress: () => handleToggleWypowiedzenie(space, true) },
+          { text: 'Usuń', onPress: () => handleRemoveSpace(space.id), style: 'destructive' },
         ]
       );
     }
-  }
+  };
 
   const handleToggleWypowiedzenie = async (space: Space, putOn: boolean) => {
     try {
@@ -183,7 +172,7 @@ export default function RoomDetailsScreen() {
             const s = r.spaces.find((sp) => sp.id === space.id);
             if (s) {
               if (putOn) {
-                const wypowiedzenieDays = 14;
+                const wypowiedzenieDays = addr.wypowiedzeniePeriod || 14;
                 const startDate = new Date();
                 const endDate = new Date(startDate);
                 endDate.setDate(endDate.getDate() + wypowiedzenieDays);
@@ -196,7 +185,6 @@ export default function RoomDetailsScreen() {
                 };
               } else {
                 s.wypowiedzenie = undefined;
-                // Restore status based on tenant presence
                 s.status = s.tenant ? 'occupied' : 'vacant';
               }
               await saveData(projects);
@@ -210,6 +198,17 @@ export default function RoomDetailsScreen() {
     } catch (error) {
       console.error('Error toggling wypowiedzenie:', error);
     }
+  };
+
+  const handleAddTenant = () => {
+    if (room.spaces.filter(s => !s.tenant).length === 0) {
+      Alert.alert('Brak wolnych miejsc', 'Wszystkie miejsca w tym pokoju są zajęte.');
+      return;
+    }
+    router.push({
+      pathname: '/select-tenant',
+      params: { projectId, addressId, roomId },
+    });
   };
 
   const renderSpaceCard = ({ item }: { item: Space }) => {
@@ -302,111 +301,124 @@ export default function RoomDetailsScreen() {
         <Pressable onPress={() => router.back()} className="p-2">
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </Pressable>
-        <View className="flex-1">
-          <View className="gap-1 mb-1">
-            <Text className="text-2xl font-bold text-foreground">{room.name}</Text>
-            <Text className="text-sm text-muted">{roomTypeLabel[room.type]}</Text>
+        <View className="flex-1 flex-row items-center justify-between">
+          <Text className="text-2xl font-bold text-foreground">{room.name}</Text>
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={handleAddSpace}
+              className="bg-primary rounded-full p-2"
+            >
+              <MaterialIcons name="add" size={24} color={colors.background} />
+            </Pressable>
+            <Pressable
+              onPress={() => handleRemoveSpace(room.spaces[room.spaces.length - 1]?.id)}
+              disabled={room.spaces.length === 0 || room.spaces[room.spaces.length - 1]?.tenant !== null}
+              className={`rounded-full p-2 ${room.spaces.length === 0 || room.spaces[room.spaces.length - 1]?.tenant !== null ? 'bg-muted' : 'bg-primary'}`}
+            >
+              <MaterialIcons name="remove" size={24} color={colors.background} />
+            </Pressable>
           </View>
         </View>
       </View>
 
-      {/* Content */}
-      <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
-        {room.spaces.length === 0 ? (
-          <View className="items-center justify-center py-8">
-            <Text className="text-muted">{t.messages.emptyAddress}</Text>
+      <FlatList
+        data={room.spaces}
+        keyExtractor={(item) => item.id}
+        renderItem={renderSpaceCard}
+        ListEmptyComponent={
+          <View className="flex-1 items-center justify-center p-6">
+            <MaterialIcons name="bed" size={48} color={colors.muted} />
+            <Text className="text-muted text-lg mt-4">Brak miejsc w tym pokoju.</Text>
+            <Text className="text-muted text-base">Dodaj miejsca, używając przycisku '+' u góry.</Text>
           </View>
-        ) : (
-          <FlatList
-            data={room.spaces}
-            renderItem={renderSpaceCard}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
-        )}
-      </ScrollView>
+        }
+        contentContainerStyle={{ paddingBottom: 100 }}
+      />
 
-      {/* FAB Button - Add Tenant to Room */}
-      <Pressable
-        onPress={() => {
-          router.push({
-            pathname: '/select-tenant',
-            params: { projectId, addressId, roomId },
-          });
-        }}
-        className="absolute bottom-20 right-4 w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg"
-        style={({ pressed }) => ({
-          opacity: pressed ? 0.8 : 1,
-        })}
-      >
-        <MaterialIcons name="add" size={28} color={colors.background} />
-      </Pressable>
+      {/* Floating Action Button */}
+      <View className="absolute bottom-6 right-4">
+        <TouchableOpacity
+          onPress={handleAddTenant}
+          className="bg-primary rounded-full p-4 shadow-lg"
+        >
+          <MaterialIcons name="person-add" size={30} color={colors.background} />
+        </TouchableOpacity>
+      </View>
 
       {/* Space Menu Modal */}
       <Modal
-        visible={spaceMenuVisible}
-        transparent
         animationType="fade"
+        transparent={true}
+        visible={spaceMenuVisible}
         onRequestClose={() => setSpaceMenuVisible(false)}
       >
         <Pressable
+          className="flex-1 justify-center items-center bg-black/50"
           onPress={() => setSpaceMenuVisible(false)}
-          className="flex-1 bg-black/50 items-center justify-center"
         >
-          <Card className="w-56 p-2 gap-1">
-            {selectedSpace && (
-              <>
-                <Pressable
-                  onPress={() => {
-                    // TODO: Edit space
-                    setSpaceMenuVisible(false);
-                  }}
-                  className="p-3 flex-row items-center gap-2"
-                >
-                  <MaterialIcons name="edit" size={20} color={colors.foreground} />
-                  <Text className="text-foreground">{t.common.edit}</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => {
-                    if (selectedSpace) {
-                      handleDeleteSpace(selectedSpace);
-                    }
-                  }}
-                  className="p-3 flex-row items-center gap-2"
-                >
-                  <MaterialIcons name="delete" size={20} color={colors.error} />
-                  <Text className="text-error">{t.common.delete}</Text>
-                </Pressable>
-
-                {selectedSpace.wypowiedzenie ? (
-                  <Pressable
-                    onPress={() => {
-                      if (selectedSpace) {
-                        handleToggleWypowiedzenie(selectedSpace, false);
-                      }
-                    }}
-                    className="p-3 flex-row items-center gap-2"
-                  >
-                    <MaterialIcons name="cancel" size={20} color={colors.warning} />
-                    <Text className="text-warning">Anuluj wypowiedzenie</Text>
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    onPress={() => {
-                      if (selectedSpace) {
-                        handleToggleWypowiedzenie(selectedSpace, true);
-                      }
-                    }}
-                    className="p-3 flex-row items-center gap-2"
-                  >
-                    <MaterialIcons name="schedule" size={20} color={colors.warning} />
-                    <Text className="text-warning">Postaw na wypowiedzenie</Text>
-                  </Pressable>
-                )}
-              </>
+          <Pressable className="bg-card p-6 rounded-2xl w-11/12 max-w-sm">
+            <Text className="text-lg font-bold text-foreground text-center mb-2">
+              {selectedSpace?.tenant ? `${selectedSpace.tenant.firstName} ${selectedSpace.tenant.lastName}` : `Miejsce ${selectedSpace?.number}`}
+            </Text>
+            
+            {selectedSpace?.tenant && (
+              <Pressable
+                onPress={() => {
+                  setSpaceMenuVisible(false);
+                  router.push({
+                    pathname: '/tenant-details',
+                    params: { projectId, addressId, tenantId: selectedSpace.tenant?.id },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-3 py-3 bg-surfaceVariant rounded-xl mb-2"
+              >
+                <MaterialIcons name="person" size={24} color={colors.primary} />
+                <Text className="text-foreground font-medium">{t.common.details}</Text>
+              </Pressable>
             )}
-          </Card>
+
+            <Pressable
+              onPress={() => {
+                setSpaceMenuVisible(false);
+                router.push({
+                  pathname: '/add-tenant',
+                  params: { projectId, addressId, roomId, spaceId: selectedSpace?.id, tenantId: selectedSpace?.tenant?.id },
+                });
+              }}
+              className="flex-row items-center justify-center gap-3 py-3 bg-surfaceVariant rounded-xl mb-2"
+            >
+              <MaterialIcons name="edit" size={24} color={colors.primary} />
+              <Text className="text-foreground font-medium">{t.common.edit}</Text>
+            </Pressable>
+
+            {selectedSpace?.wypowiedzenie ? (
+              <Pressable
+                onPress={() => handleToggleWypowiedzenie(selectedSpace, false)}
+                className="flex-row items-center justify-center gap-3 py-3 bg-warning/20 rounded-xl mb-2"
+              >
+                <MaterialIcons name="cancel" size={24} color={colors.warning} />
+                <Text className="text-warning font-medium">{t.common.cancelWypowiedzenie}</Text>
+              </Pressable>
+            ) : (
+              selectedSpace?.tenant && (
+                <Pressable
+                  onPress={() => handleToggleWypowiedzenie(selectedSpace, true)}
+                  className="flex-row items-center justify-center gap-3 py-3 bg-warning/20 rounded-xl mb-2"
+                >
+                  <MaterialIcons name="warning" size={24} color={colors.warning} />
+                  <Text className="text-warning font-medium">{t.common.putOnWypowiedzenie}</Text>
+                </Pressable>
+              )
+            )}
+
+            <Pressable
+              onPress={() => handleDeleteSpace(selectedSpace as Space)}
+              className="flex-row items-center justify-center gap-3 py-3 bg-error/20 rounded-xl"
+            >
+              <MaterialIcons name="delete" size={24} color={colors.error} />
+              <Text className="text-error font-medium">{t.common.delete}</Text>
+            </Pressable>
+          </Pressable>
         </Pressable>
       </Modal>
     </ScreenContainer>

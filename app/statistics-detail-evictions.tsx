@@ -167,7 +167,14 @@ export default function EvictionsDetailScreen() {
                           {expandedAddress === addressId && (
                             <View className="ml-2 gap-2">
                               {addressEvictions.map((eviction, idx) => (
-                                <Card key={idx} className="p-3 bg-surfaceVariant/30">
+                                <Pressable
+                                  key={idx}
+                                  onPress={() => router.push({
+                                    pathname: '/address-details',
+                                    params: { projectId: eviction.projectId, addressId: eviction.addressId },
+                                  })}
+                                >
+                                  <Card className="p-3 bg-surfaceVariant/30">
                                   <View className="gap-2">
                                     {/* Room */}
                                     <View className="flex-row items-center gap-2">
@@ -215,6 +222,7 @@ export default function EvictionsDetailScreen() {
                                     })()}
                                   </View>
                                 </Card>
+                                </Pressable>
                               ))}
                             </View>
                           )}

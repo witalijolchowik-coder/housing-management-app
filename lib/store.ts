@@ -326,67 +326,50 @@ export const addAddress = async (projectId: string, addressData: AddAddressFormD
       type: 'male',
       totalSpaces: 0,
       spaces: [],
-      amenities: {
-        shower: false,
-        toilet: false,
-        wifi: false,
-        stove: false,
-        fridge: false,
-      },
     });
   }
 
-  // Auto-generate couple rooms (2 beds each)
+  // Auto-generate couple rooms
   for (let i = 0; i < coupleRooms; i++) {
     const roomId = generateId();
-    const spaces: Space[] = [];
-    
-    for (let j = 0; j < 2; j++) {
-      spaces.push({
-        id: generateId(),
-        roomId,
-        number: j + 1,
-        status: 'vacant',
-        tenant: null,
-      });
-    }
-
     rooms.push({
       id: roomId,
-      addressId: '',
+      addressId: '', // Will be set below
       name: `Pokój dla par ${i + 1}`,
       type: 'couple',
-      totalSpaces: 2,
-      spaces,
-      amenities: {
-        shower: false,
-        toilet: false,
-        wifi: false,
-        stove: false,
-        fridge: false,
-      },
+      totalSpaces: 0,
+      spaces: [],
     });
   }
 
   const newAddress: Address = {
-    ...restAddressData,
     id: generateId(),
     projectId,
-    rooms,
-    status: 'active',
+    name: restAddressData.name,
+    street: restAddressData.street,
+    houseNumber: restAddressData.houseNumber,
+    postalCode: restAddressData.postalCode,
+    city: restAddressData.city,
+    totalSpaces: restAddressData.totalSpaces || 0,
+    wypowiedzeniePeriod: restAddressData.wypowiedzeniePeriod || 14,
+    rooms: rooms,
     unassignedTenants: [],
-    photos: [],
+    isWholeAddress: restAddressData.isWholeAddress || false,
+    operator: restAddressData.operator || '',
   };
 
-  // Set addressId in rooms
-  newAddress.rooms.forEach((r) => (r.addressId = newAddress.id));
+  // Set addressId for rooms and spaces
+  newAddress.rooms.forEach(room => {
+    room.addressId = newAddress.id;
+    room.spaces.forEach(space => space.roomId = room.id);
+  });
 
   projects[projectIndex].addresses.push(newAddress);
   await saveData(projects);
   return newAddress;
 };
 
-export const updateAddress = async (projectId: string, addressId: string, updates: AddAddressFormData): Promise<void> => {
+export const updateAddress = async (projectId: string, addressId: string, updates: Partial<Address>): Promise<void> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
@@ -394,76 +377,7 @@ export const updateAddress = async (projectId: string, addressId: string, update
   const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
   if (addressIndex === -1) throw new Error('Address not found');
 
-  const currentAddress = projects[projectIndex].addresses[addressIndex];
-  
-  // Handle room management
-  const currentRegularRooms = currentAddress.rooms.filter(r => r.type !== 'couple');
-  const currentCoupleRooms = currentAddress.rooms.filter(r => r.type === 'couple');
-
-  // Update regular rooms
-  if (updates.regularRooms > currentRegularRooms.length) {
-    const diff = updates.regularRooms - currentRegularRooms.length;
-    for (let i = 0; i < diff; i++) {
-      currentAddress.rooms.push({
-        id: generateId(),
-        addressId: currentAddress.id,
-        name: `Pokój ${currentRegularRooms.length + i + 1}`,
-        type: 'male',
-        totalSpaces: 0,
-        spaces: [],
-        amenities: { shower: false, toilet: false, wifi: false, stove: false, fridge: false },
-      });
-    }
-  } else if (updates.regularRooms < currentRegularRooms.length) {
-    const diff = currentRegularRooms.length - updates.regularRooms;
-    let removed = 0;
-    for (let i = currentAddress.rooms.length - 1; i >= 0 && removed < diff; i--) {
-      const room = currentAddress.rooms[i];
-      const isEmpty = room.spaces.every(s => !s.tenant);
-      if (room.type !== 'couple' && isEmpty) {
-        currentAddress.rooms.splice(i, 1);
-        removed++;
-      }
-    }
-  }
-
-  // Update couple rooms
-  if (updates.coupleRooms > currentCoupleRooms.length) {
-    const diff = updates.coupleRooms - currentCoupleRooms.length;
-    for (let i = 0; i < diff; i++) {
-      const roomId = generateId();
-      const spaces: Space[] = [
-        { id: generateId(), roomId, number: 1, status: 'vacant' },
-        { id: generateId(), roomId, number: 2, status: 'vacant' }
-      ];
-      currentAddress.rooms.push({
-        id: roomId,
-        addressId: currentAddress.id,
-        name: `Pokój dla par ${currentCoupleRooms.length + i + 1}`,
-        type: 'couple',
-        totalSpaces: 2,
-        spaces,
-        amenities: { shower: false, toilet: false, wifi: false, stove: false, fridge: false },
-      });
-    }
-  } else if (updates.coupleRooms < currentCoupleRooms.length) {
-    const diff = currentCoupleRooms.length - updates.coupleRooms;
-    let removed = 0;
-    for (let i = currentAddress.rooms.length - 1; i >= 0 && removed < diff; i--) {
-      const room = currentAddress.rooms[i];
-      const isEmpty = room.spaces.every(s => !s.tenant);
-      if (room.type === 'couple' && isEmpty) {
-        currentAddress.rooms.splice(i, 1);
-        removed++;
-      }
-    }
-  }
-
-  projects[projectIndex].addresses[addressIndex] = {
-    ...currentAddress,
-    ...updates,
-  };
-
+  projects[projectIndex].addresses[addressIndex] = { ...projects[projectIndex].addresses[addressIndex], ...updates };
   await saveData(projects);
 };
 
@@ -476,108 +390,30 @@ export const deleteAddress = async (projectId: string, addressId: string): Promi
   await saveData(projects);
 };
 
-// Put address on wypowiedzenie
-export const putAddressOnWypowiedzenie = async (projectId: string, addressId: string): Promise<void> => {
-  const projects = await loadData();
-  const projectIndex = projects.findIndex((p) => p.id === projectId);
-  if (projectIndex === -1) throw new Error('Project not found');
-
-  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
-  if (addressIndex === -1) throw new Error('Address not found');
-
-  const address = projects[projectIndex].addresses[addressIndex];
-  const evictionPeriod = address.evictionPeriod || 14;
-  const startDate = new Date().toISOString().split('T')[0];
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() + evictionPeriod);
-
-  address.status = 'wypowiedzenie';
-  address.addressWypowiedzienieStart = startDate;
-
-  for (const room of address.rooms) {
-    for (const space of room.spaces) {
-      if (space.status !== 'wypowiedzenie') {
-        space.status = 'wypowiedzenie';
-        space.wypowiedzenie = {
-          startDate,
-          endDate: endDate.toISOString().split('T')[0],
-          paidUntil: endDate.toISOString().split('T')[0],
-          groupedWithAddress: true,
-        };
-      }
-    }
-  }
-
-  await saveData(projects);
-};
-
-// Remove address from wypowiedzenie
-export const removeAddressFromWypowiedzenie = async (projectId: string, addressId: string): Promise<void> => {
-  const projects = await loadData();
-  const projectIndex = projects.findIndex((p) => p.id === projectId);
-  if (projectIndex === -1) throw new Error('Project not found');
-
-  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
-  if (addressIndex === -1) throw new Error('Address not found');
-
-  const address = projects[projectIndex].addresses[addressIndex];
-  address.status = 'active';
-  address.addressWypowiedzienieStart = undefined;
-
-  for (const room of address.rooms) {
-    for (const space of room.spaces) {
-      if (space.wypowiedzenie?.groupedWithAddress) {
-        space.status = space.tenant ? 'occupied' : 'vacant';
-        space.wypowiedzenie = undefined;
-      }
-    }
-  }
-
-  await saveData(projects);
-};
-
-export const updateProjectsOrder = async (projects: Project[]): Promise<void> => {
-  await saveData(projects);
-};
-
 // CRUD operations for Rooms
-export const addRoom = async (
-  projectId: string,
-  addressId: string,
-  roomData: { name: string; type: Room['type']; totalSpaces: number; amenities?: any }
-): Promise<Room> => {
+export const addRoom = async (projectId: string, addressId: string, roomData: Omit<Room, 'id' | 'addressId' | 'spaces'> & { spacesCount: number }): Promise<Room> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
 
   const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
   if (addressIndex === -1) throw new Error('Address not found');
-
-  const spaces: Space[] = Array.from({ length: roomData.totalSpaces }, (_, i) => ({
-    id: generateId(),
-    roomId: '',
-    number: i + 1,
-    status: 'vacant',
-  }));
 
   const newRoom: Room = {
     id: generateId(),
     addressId,
     name: roomData.name,
     type: roomData.type,
-    totalSpaces: roomData.totalSpaces,
-    spaces,
-    amenities: roomData.amenities || {},
+    totalSpaces: roomData.spacesCount,
+    spaces: Array.from({ length: roomData.spacesCount }, (_, i) => ({
+      id: generateId(),
+      roomId: '', // Will be set below
+      number: i + 1,
+      status: 'vacant',
+      tenant: null,
+    })),
   };
-
-  // If room type is 'couple', ensure 2 spaces are created
-  if (newRoom.type === 'couple' && newRoom.spaces.length !== 2) {
-    newRoom.spaces = [
-      { id: generateId(), roomId: newRoom.id, number: 1, status: 'vacant' },
-      { id: generateId(), roomId: newRoom.id, number: 2, status: 'vacant' },
-    ];
-    newRoom.totalSpaces = 2;
-  }
+  newRoom.spaces.forEach(space => space.roomId = newRoom.id);
 
   projects[projectIndex].addresses[addressIndex].rooms.push(newRoom);
   await saveData(projects);
@@ -595,10 +431,7 @@ export const updateRoom = async (projectId: string, addressId: string, roomId: s
   const roomIndex = projects[projectIndex].addresses[addressIndex].rooms.findIndex((r) => r.id === roomId);
   if (roomIndex === -1) throw new Error('Room not found');
 
-  projects[projectIndex].addresses[addressIndex].rooms[roomIndex] = {
-    ...projects[projectIndex].addresses[addressIndex].rooms[roomIndex],
-    ...updates,
-  };
+  projects[projectIndex].addresses[addressIndex].rooms[roomIndex] = { ...projects[projectIndex].addresses[addressIndex].rooms[roomIndex], ...updates };
   await saveData(projects);
 };
 
@@ -615,6 +448,71 @@ export const deleteRoom = async (projectId: string, addressId: string, roomId: s
 };
 
 // CRUD operations for Spaces
+export const addSpace = async (projectId: string, addressId: string, roomId: string): Promise<void> => {
+  const projects = await loadData();
+  const projectIndex = projects.findIndex((p) => p.id === projectId);
+  if (projectIndex === -1) throw new Error('Project not found');
+
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
+
+  const address = projects[projectIndex].addresses[addressIndex];
+
+  const roomIndex = address.rooms.findIndex((r) => r.id === roomId);
+  if (roomIndex === -1) throw new Error('Room not found');
+
+  const room = address.rooms[roomIndex];
+
+  // Check if adding a space exceeds the address's totalSpaces limit
+  const currentTotalSpacesInAddress = address.rooms.reduce((sum, r) => sum + r.totalSpaces, 0);
+  if (currentTotalSpacesInAddress + 1 > address.totalSpaces) {
+    // If it exceeds, ask the user if they want to increase the address's totalSpaces
+    // This logic will be handled in the UI, here we just throw an error
+    throw new Error('Przekroczono limit miejsc w adresie. Zwiększ limit miejsc w ustawieniach adresu lub anuluj.');
+  }
+
+  const newSpace: Space = {
+    id: generateId(),
+    roomId: room.id,
+    number: room.spaces.length + 1,
+    status: 'vacant',
+    tenant: null,
+  };
+
+  room.spaces.push(newSpace);
+  room.totalSpaces++;
+  await saveData(projects);
+};
+
+export const removeSpace = async (projectId: string, addressId: string, roomId: string, spaceId: string): Promise<void> => {
+  const projects = await loadData();
+  const projectIndex = projects.findIndex((p) => p.id === projectId);
+  if (projectIndex === -1) throw new Error('Project not found');
+
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
+
+  const roomIndex = projects[projectIndex].addresses[addressIndex].rooms.findIndex((r) => r.id === roomId);
+  if (roomIndex === -1) throw new Error('Room not found');
+
+  const room = projects[projectIndex].addresses[addressIndex].rooms[roomIndex];
+  const spaceIndex = room.spaces.findIndex((s) => s.id === spaceId);
+
+  if (spaceIndex === -1) throw new Error('Space not found');
+
+  if (room.spaces[spaceIndex].tenant) {
+    throw new Error('Nie można usunąć zajętego miejsca. Najpierw wymelduj mieszkańca.');
+  }
+
+  room.spaces.splice(spaceIndex, 1);
+  room.totalSpaces--;
+  // Re-number remaining spaces
+  room.spaces.forEach((space, index) => {
+    space.number = index + 1;
+  });
+  await saveData(projects);
+};
+
 export const updateSpace = async (projectId: string, addressId: string, roomId: string, spaceId: string, updates: Partial<Space>): Promise<void> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
@@ -629,15 +527,12 @@ export const updateSpace = async (projectId: string, addressId: string, roomId: 
   const spaceIndex = projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces.findIndex((s) => s.id === spaceId);
   if (spaceIndex === -1) throw new Error('Space not found');
 
-  projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex] = {
-    ...projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex],
-    ...updates,
-  };
+  projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex] = { ...projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex], ...updates };
   await saveData(projects);
 };
 
 // CRUD operations for Tenants
-export const addTenantToSpace = async (projectId: string, addressId: string, roomId: string, spaceId: string, tenant: Tenant): Promise<void> => {
+export const addTenant = async (projectId: string, addressId: string, tenantData: Omit<Tenant, 'id'>): Promise<Tenant> => {
   const projects = await loadData();
   const projectIndex = projects.findIndex((p) => p.id === projectId);
   if (projectIndex === -1) throw new Error('Project not found');
@@ -645,133 +540,153 @@ export const addTenantToSpace = async (projectId: string, addressId: string, roo
   const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
   if (addressIndex === -1) throw new Error('Address not found');
 
-  const roomIndex = projects[projectIndex].addresses[addressIndex].rooms.findIndex((r) => r.id === roomId);
-  if (roomIndex === -1) throw new Error('Room not found');
+  const newTenant: Tenant = {
+    id: generateId(),
+    ...tenantData,
+  };
 
-  const spaceIndex = projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces.findIndex((s) => s.id === spaceId);
-  if (spaceIndex === -1) throw new Error('Space not found');
-
-  // Remove tenant from unassigned if they were there
-  projects[projectIndex].addresses[addressIndex].unassignedTenants = projects[projectIndex].addresses[addressIndex].unassignedTenants.filter(t => t.id !== tenant.id);
-
-  // Assign tenant to space
-  projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex].tenant = { ...tenant, spaceId };
-  projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex].status = 'occupied';
-
+  projects[projectIndex].addresses[addressIndex].unassignedTenants.push(newTenant);
   await saveData(projects);
-};
-
-export const removeTenantFromSpace = async (projectId: string, addressId: string, roomId: string, spaceId: string): Promise<void> => {
-  const projects = await loadData();
-  const projectIndex = projects.findIndex((p) => p.id === projectId);
-  if (projectIndex === -1) throw new Error('Project not found');
-
-  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
-  if (addressIndex === -1) throw new Error('Address not found');
-
-  const roomIndex = projects[projectIndex].addresses[addressIndex].rooms.findIndex((r) => r.id === roomId);
-  if (roomIndex === -1) throw new Error('Room not found');
-
-  const spaceIndex = projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces.findIndex((s) => s.id === spaceId);
-  if (spaceIndex === -1) throw new Error('Space not found');
-
-  projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex].tenant = null;
-  projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex].status = 'vacant';
-  projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex].wypowiedzenie = undefined;
-
-  await saveData(projects);
+  return newTenant;
 };
 
 export const updateTenant = async (projectId: string, addressId: string, tenantId: string, updates: Partial<Tenant>): Promise<void> => {
   const projects = await loadData();
-  const project = projects.find(p => p.id === projectId);
-  if (!project) throw new Error('Project not found');
+  const projectIndex = projects.findIndex((p) => p.id === projectId);
+  if (projectIndex === -1) throw new Error('Project not found');
 
-  const address = project.addresses.find(a => a.id === addressId);
-  if (!address) throw new Error('Address not found');
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
 
-  let tenantFound = false;
-
-  // Check unassigned tenants
-  const unassignedTenantIndex = address.unassignedTenants.findIndex(t => t.id === tenantId);
+  // Check unassigned tenants first
+  const unassignedTenantIndex = projects[projectIndex].addresses[addressIndex].unassignedTenants.findIndex(t => t.id === tenantId);
   if (unassignedTenantIndex !== -1) {
-    address.unassignedTenants[unassignedTenantIndex] = { ...address.unassignedTenants[unassignedTenantIndex], ...updates };
-    tenantFound = true;
+    projects[projectIndex].addresses[addressIndex].unassignedTenants[unassignedTenantIndex] = { ...projects[projectIndex].addresses[addressIndex].unassignedTenants[unassignedTenantIndex], ...updates };
+    await saveData(projects);
+    return;
   }
 
-  // Check assigned tenants
-  if (!tenantFound) {
-    for (const room of address.rooms) {
-      const space = room.spaces.find(s => s.tenant?.id === tenantId);
-      if (space && space.tenant) {
-        space.tenant = { ...space.tenant, ...updates };
-        tenantFound = true;
-        break;
-      }
+  // Then check assigned tenants in spaces
+  for (const room of projects[projectIndex].addresses[addressIndex].rooms) {
+    const space = room.spaces.find(s => s.tenant?.id === tenantId);
+    if (space && space.tenant) {
+      space.tenant = { ...space.tenant, ...updates };
+      await saveData(projects);
+      return;
     }
   }
 
-  if (!tenantFound) throw new Error('Tenant not found');
+  throw new Error('Tenant not found');
+};
 
+export const deleteTenant = async (projectId: string, addressId: string, tenantId: string): Promise<void> => {
+  const projects = await loadData();
+  const projectIndex = projects.findIndex((p) => p.id === projectId);
+  if (projectIndex === -1) throw new Error('Project not found');
+
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
+
+  // Remove from unassigned tenants
+  projects[projectIndex].addresses[addressIndex].unassignedTenants = projects[projectIndex].addresses[addressIndex].unassignedTenants.filter(t => t.id !== tenantId);
+
+  // Remove from spaces if assigned
+  for (const room of projects[projectIndex].addresses[addressIndex].rooms) {
+    for (const space of room.spaces) {
+      if (space.tenant?.id === tenantId) {
+        space.tenant = null;
+        space.status = 'vacant';
+        space.wypowiedzenie = undefined;
+      }
+    }
+  }
   await saveData(projects);
 };
 
-export const putSpaceOnWypowiedzenie = async (
-  projectId: string,
-  addressId: string,
-  roomId: string,
-  spaceId: string,
-  wypowiedzenieStartDate: string,
-  wypowiedzenieEndDate: string,
-  paidUntilDate: string
-): Promise<void> => {
+export const assignTenantToSpace = async (projectId: string, addressId: string, roomId: string, spaceId: string, tenantId: string): Promise<void> => {
   const projects = await loadData();
-  const project = projects.find(p => p.id === projectId);
-  if (!project) throw new Error('Project not found');
+  const projectIndex = projects.findIndex((p) => p.id === projectId);
+  if (projectIndex === -1) throw new Error('Project not found');
 
-  const address = project.addresses.find(a => a.id === addressId);
-  if (!address) throw new Error('Address not found');
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
 
-  const room = address.rooms.find(r => r.id === roomId);
-  if (!room) throw new Error('Room not found');
+  const roomIndex = projects[projectIndex].addresses[addressIndex].rooms.findIndex((r) => r.id === roomId);
+  if (roomIndex === -1) throw new Error('Room not found');
 
-  const space = room.spaces.find(s => s.id === spaceId);
-  if (!space) throw new Error('Space not found');
+  const spaceIndex = projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces.findIndex((s) => s.id === spaceId);
+  if (spaceIndex === -1) throw new Error('Space not found');
 
-  space.wypowiedzenie = {
-    startDate: wypowiedzenieStartDate,
-    endDate: wypowiedzenieEndDate,
-    paidUntil: paidUntilDate,
+  const tenantIndex = projects[projectIndex].addresses[addressIndex].unassignedTenants.findIndex(t => t.id === tenantId);
+  if (tenantIndex === -1) throw new Error('Tenant not found in unassigned list');
+
+  const tenantToAssign = projects[projectIndex].addresses[addressIndex].unassignedTenants[tenantIndex];
+
+  // Check if the space is already occupied
+  if (projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex].tenant) {
+    throw new Error('Miejsce jest już zajęte.');
+  }
+
+  // Assign tenant to space
+  projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex].tenant = {
+    ...tenantToAssign,
+    spaceId: spaceId, // Link tenant to the space
   };
-  space.status = 'wypowiedzenie';
+  projects[projectIndex].addresses[addressIndex].rooms[roomIndex].spaces[spaceIndex].status = 'occupied';
+
+  // Remove tenant from unassigned list
+  projects[projectIndex].addresses[addressIndex].unassignedTenants.splice(tenantIndex, 1);
 
   await saveData(projects);
 };
 
-export const removeSpaceFromWypowiedzenie = async (
+export const evictTenant = async (
   projectId: string,
   addressId: string,
-  roomId: string,
-  spaceId: string
+  tenantId: string,
+  checkoutDate: string,
+  reason: EvictionReason
 ): Promise<void> => {
   const projects = await loadData();
-  const project = projects.find(p => p.id === projectId);
-  if (!project) throw new Error('Project not found');
+  const projectIndex = projects.findIndex((p) => p.id === projectId);
+  if (projectIndex === -1) throw new Error('Project not found');
 
-  const address = project.addresses.find(a => a.id === addressId);
-  if (!address) throw new Error('Address not found');
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
 
-  const room = address.rooms.find(r => r.id === roomId);
-  if (!room) throw new Error('Room not found');
+  const address = projects[projectIndex].addresses[addressIndex];
 
-  const space = room.spaces.find(s => s.id === spaceId);
-  if (!space) throw new Error('Space not found');
+  let evictedTenant: Tenant | null = null;
+  let roomName: string | undefined = undefined;
 
-  space.wypowiedzenie = undefined;
-  if (space.tenant) {
-    space.status = 'occupied';
-  } else {
-    space.status = 'vacant';
+  for (const room of address.rooms) {
+    const space = room.spaces.find(s => s.tenant?.id === tenantId);
+    if (space && space.tenant) {
+      evictedTenant = space.tenant;
+      roomName = room.name;
+
+      // Add to eviction archive
+      await addToEvictionArchive(
+        evictedTenant,
+        projectId,
+        projects[projectIndex].name,
+        addressId,
+        address.name,
+        roomName,
+        checkoutDate,
+        reason
+      );
+
+      // Clear tenant from space
+      space.tenant = null;
+      space.status = 'vacant';
+      space.wypowiedzenie = undefined;
+      break;
+    }
+  }
+
+  if (!evictedTenant) {
+    throw new Error('Tenant not found in any space');
   }
 
   await saveData(projects);
@@ -785,98 +700,51 @@ export const updateSpaceWypowiedzenieStartDate = async (
   newStartDate: string
 ): Promise<void> => {
   const projects = await loadData();
-  const project = projects.find(p => p.id === projectId);
-  if (!project) throw new Error('Project not found');
+  const projectIndex = projects.findIndex((p) => p.id === projectId);
+  if (projectIndex === -1) throw new Error('Project not found');
 
-  const address = project.addresses.find(a => a.id === addressId);
-  if (!address) throw new Error('Address not found');
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
 
-  const room = address.rooms.find(r => r.id === roomId);
-  if (!room) throw new Error('Room not found');
+  const address = projects[projectIndex].addresses[addressIndex];
 
-  const space = room.spaces.find(s => s.id === spaceId);
-  if (!space) throw new Error('Space not found');
+  const roomIndex = address.rooms.findIndex((r) => r.id === roomId);
+  if (roomIndex === -1) throw new Error('Room not found');
 
-  if (!space.wypowiedzenie) throw new Error('Space is not on wypowiedzenie');
+  const room = address.rooms[roomIndex];
+  const spaceIndex = room.spaces.findIndex((s) => s.id === spaceId);
 
-  // Calculate new end date based on address eviction period
-  const addressEvictionPeriod = address.evictionPeriod || 14; // Default to 14 days
-  const newEndDate = new Date(newStartDate);
-  newEndDate.setDate(newEndDate.getDate() + addressEvictionPeriod);
+  if (spaceIndex === -1) throw new Error('Space not found');
 
-  space.wypowiedzenie = {
-    ...space.wypowiedzenie,
-    startDate: newStartDate,
-    endDate: newEndDate.toISOString().split('T')[0],
-  };
+  const space = room.spaces[spaceIndex];
+
+  if (!space.wypowiedzenie) {
+    throw new Error('Space is not on wypowiedzenie');
+  }
+
+  const wypowiedzeniePeriod = address.wypowiedzeniePeriod || 14; // Default to 14 days
+  const startDate = new Date(newStartDate);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + wypowiedzeniePeriod);
+
+  space.wypowiedzenie.startDate = newStartDate;
+  space.wypowiedzenie.endDate = endDate.toISOString().split('T')[0];
 
   await saveData(projects);
 };
 
-export const evictTenant = async (
+export const updateAddressTotalSpaces = async (
   projectId: string,
   addressId: string,
-  tenantId: string,
-  checkoutDate: string,
-  reason: EvictionReason
+  newTotalSpaces: number
 ): Promise<void> => {
   const projects = await loadData();
-  const project = projects.find(p => p.id === projectId);
-  if (!project) throw new Error('Project not found');
+  const projectIndex = projects.findIndex((p) => p.id === projectId);
+  if (projectIndex === -1) throw new Error('Project not found');
 
-  const address = project.addresses.find(a => a.id === addressId);
-  if (!address) throw new Error('Address not found');
+  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
+  if (addressIndex === -1) throw new Error('Address not found');
 
-  let tenantToArchive: Tenant | undefined;
-  let spaceToVacate: Space | undefined;
-  let roomName: string = '';
-
-  // Remove tenant from unassignedTenants if they were there
-  address.unassignedTenants = address.unassignedTenants.filter(t => {
-    if (t.id === tenantId) {
-      tenantToArchive = t;
-      return false;
-    }
-    return true;
-  });
-
-  // Find and remove tenant from a space
-  for (const room of address.rooms) {
-    for (const space of room.spaces) {
-      if (space.tenant && space.tenant.id === tenantId) {
-        tenantToArchive = space.tenant;
-        spaceToVacate = space;
-        roomName = room.name;
-        space.tenant = null;
-        space.status = 'vacant';
-        space.wypowiedzenie = undefined; // Clear wypowiedzenie status on eviction
-        break;
-      }
-    }
-    if (tenantToArchive) break;
-  }
-
-  if (!tenantToArchive) throw new Error('Tenant not found for eviction');
-
-  // Add to eviction archive
-  const archive = await loadEvictionArchive();
-  archive.push({
-    id: generateId(),
-    tenantId: tenantToArchive.id,
-    firstName: tenantToArchive.firstName,
-    lastName: tenantToArchive.lastName,
-    gender: tenantToArchive.gender,
-    birthYear: tenantToArchive.birthYear,
-    checkInDate: tenantToArchive.checkInDate,
-    checkOutDate: checkoutDate,
-    reason: reason,
-    monthlyPrice: tenantToArchive.monthlyPrice,
-    phone: tenantToArchive.phone,
-    projectName: project.name,
-    addressName: address.name,
-    roomName: roomName,
-  });
-  await saveEvictionArchive(archive);
-
+  projects[projectIndex].addresses[addressIndex].totalSpaces = newTotalSpaces;
   await saveData(projects);
 };
