@@ -9,7 +9,7 @@ import { OccupancyProgress } from '@/components/ui/occupancy-progress';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Address, Room, Tenant, Project, EvictionFormData, Space } from '@/types';
-import { loadData, calculateRoomStats, getDaysRemaining, saveData, putSpaceOnWypowiedzenie, removeSpaceFromWypowiedzenie } from '@/lib/store';
+import { loadData, calculateRoomStats, getDaysRemaining, saveData, evictTenant } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 import { EvictionFormModal } from '@/components/eviction-form-modal';
 import { GenderIcon } from '@/components/ui/gender-icon';
@@ -96,15 +96,8 @@ export default function AddressDetailsScreen() {
         const addr = project.addresses.find((a) => a.id === addressId);
         if (addr) {
           addr.unassignedTenants = addr.unassignedTenants.filter((t) => t.id !== tenant.id);
-          if (tenant.spaceId) {
-            for (const room of addr.rooms) {
-              const space = room.spaces.find((s) => s.id === tenant.spaceId);
-              if (space && space.tenant) {
-                space.tenant = null;
-                space.status = space.wypowiedzenie ? 'wypowiedzenie' : 'vacant';
-              }
-            }
-          }
+          // If tenant was assigned to a space, this function should not be called.
+          // Assigned tenants are evicted, not deleted directly.
           await saveData(projects);
           await loadAddress();
           setTenantMenuVisible(false);
@@ -116,29 +109,24 @@ export default function AddressDetailsScreen() {
     }
   };
 
-  const handleToggleWypowiedzenie = async (tenant: Tenant) => {
-    const spaceInfo = getTenantSpace(tenant.id);
-    if (!spaceInfo) return;
-
-    const { room, space } = spaceInfo;
-    
+  const handleEvictTenant = async (formData: EvictionFormData) => {
+    if (!selectedTenant || !project || !address) return;
     try {
-      if (space.status === 'wypowiedzenie') {
-        await removeSpaceFromWypowiedzenie(projectId, addressId, room.id, space.id);
-        Alert.alert('Sukces', 'Wypowiedzenie zostało anulowane');
-      } else {
-        if (!address.evictionPeriod) {
-          Alert.alert('Błąd', 'Proszę najpierw ustawić okres wypowiedzenia w ustawieniach adresu');
-          return;
-        }
-        await putSpaceOnWypowiedzenie(projectId, addressId, room.id, space.id, address.evictionPeriod);
-        Alert.alert('Sukces', 'Miejsce zostało postawione na wypowiedzenie');
-      }
-      await loadAddress();
+      await evictTenant(
+        project.id,
+        address.id,
+        selectedTenant.id,
+        formData.checkoutDate,
+        formData.reason
+      );
+      Alert.alert('Sukces', 'Mieszkaniec został wymeldowany i przeniesiony do archiwum');
+      setEvictionModalVisible(false);
       setTenantMenuVisible(false);
+      setSelectedTenant(undefined);
+      await loadAddress();
     } catch (error) {
-      console.error('Error toggling wypowiedzenie:', error);
-      Alert.alert('Błąd', 'Wystąpił błąd podczas zmiany statusu wypowiedzenia');
+      console.error('Error evicting tenant:', error);
+      Alert.alert('Błąd', 'Wystąpił błąd podczas wymeldowania mieszkańca');
     }
   };
 
@@ -396,20 +384,6 @@ export default function AddressDetailsScreen() {
               onPress={() => {
                 setTenantMenuVisible(false);
                 router.push({
-                  pathname: '/tenant-details',
-                  params: { projectId, addressId, tenantId: selectedTenant?.id },
-                });
-              }}
-              className="flex-row items-center justify-center gap-3 py-3 bg-surfaceVariant rounded-xl"
-            >
-              <MaterialIcons name="person" size={24} color={colors.primary} />
-              <Text className="text-foreground font-medium">{t.common.details}</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                setTenantMenuVisible(false);
-                router.push({
                   pathname: '/add-tenant',
                   params: { projectId, addressId, tenantId: selectedTenant?.id },
                 });
@@ -420,36 +394,37 @@ export default function AddressDetailsScreen() {
               <Text className="text-foreground font-medium">{t.common.edit}</Text>
             </Pressable>
 
-            {selectedTenant?.spaceId && (
+            {selectedTenant?.spaceId ? (
               <Pressable
-                onPress={() => selectedTenant && handleToggleWypowiedzenie(selectedTenant)}
+                onPress={() => {
+                  setTenantMenuVisible(false);
+                  setEvictionModalVisible(true);
+                }}
                 className="flex-row items-center justify-center gap-3 py-3 bg-warning/10 border border-warning/20 rounded-xl"
               >
-                <MaterialIcons name="warning" size={24} color={colors.warning} />
-                <Text className="text-warning font-medium">
-                  {getTenantSpace(selectedTenant.id)?.space.status === 'wypowiedzenie' ? 'Anuluj Wyp.' : 'Wypowiedzenie'}
-                </Text>
+                <MaterialIcons name="exit-to-app" size={24} color={colors.warning} />
+                <Text className="text-warning font-medium">Wymelduj</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  if (selectedTenant) {
+                    Alert.alert(
+                      t.common.delete,
+                      `Czy na pewno chcesz usunąć mieszkańca ${selectedTenant.firstName} ${selectedTenant.lastName}?`,
+                      [
+                        { text: t.common.cancel, style: 'cancel' },
+                        { text: t.common.delete, style: 'destructive', onPress: () => handleDeleteTenant(selectedTenant) },
+                      ]
+                    );
+                  }
+                }}
+                className="flex-row items-center justify-center gap-3 py-3 bg-error/10 border border-error/20 rounded-xl"
+              >
+                <MaterialIcons name="delete" size={24} color={colors.error} />
+                <Text className="text-error font-medium">{t.common.delete}</Text>
               </Pressable>
             )}
-
-            <Pressable
-              onPress={() => {
-                if (selectedTenant) {
-                  Alert.alert(
-                    t.common.delete,
-                    `Czy na pewno chcesz usunąć mieszkańca ${selectedTenant.firstName} ${selectedTenant.lastName}?`,
-                    [
-                      { text: t.common.cancel, style: 'cancel' },
-                      { text: t.common.delete, style: 'destructive', onPress: () => handleDeleteTenant(selectedTenant) },
-                    ]
-                  );
-                }
-              }}
-              className="flex-row items-center justify-center gap-3 py-3 bg-error/10 border border-error/20 rounded-xl"
-            >
-              <MaterialIcons name="delete" size={24} color={colors.error} />
-              <Text className="text-error font-medium">{t.common.delete}</Text>
-            </Pressable>
           </View>
         </Pressable>
       </Modal>
@@ -506,7 +481,7 @@ export default function AddressDetailsScreen() {
                     `Czy na pewno chcesz usunąć pokój ${selectedRoom.name}?`,
                     [
                       { text: t.common.cancel, style: 'cancel' },
-                      { text: t.common.delete, style: 'destructive', onPress: () => handleDeleteRoom(selectedRoom) },
+                      { text: 'Usuń', style: 'destructive', onPress: () => handleDeleteRoom(selectedRoom) },
                     ]
                   );
                 }
@@ -519,6 +494,12 @@ export default function AddressDetailsScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      <EvictionFormModal
+        visible={evictionModalVisible}
+        onClose={() => setEvictionModalVisible(false)}
+        onSave={handleEvictTenant}
+      />
     </ScreenContainer>
   );
 }
