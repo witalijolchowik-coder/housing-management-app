@@ -156,9 +156,11 @@ export default function AllAddressesScreen() {
                       </View>
 
                       <View className="flex-row items-center gap-4 mt-2 pt-2 border-t border-border/20">
-                        <GenderIcon gender="male" count={stats.male} size={14} showCount={true} />
-                        <GenderIcon gender="female" count={stats.female} size={14} showCount={true} />
-                        <GenderIcon gender="couple" count={stats.couples} size={14} showCount={true} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                          <GenderIcon gender="male" count={stats.male} size={16} showCount={true} />
+                          <GenderIcon gender="female" count={stats.female} size={16} showCount={true} />
+                          <GenderIcon gender="couple" count={stats.couples} size={16} showCount={true} />
+                        </View>
                       </View>
                     </Card>
                   </Pressable>
