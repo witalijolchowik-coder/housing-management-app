@@ -1,209 +1,155 @@
 import { View, Text, TextInput, Pressable, FlatList, ScrollView, Alert } from 'react-native';
-import { useState, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useState, useCallback, useMemo } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Project, Tenant } from '@/types';
-import { loadData, loadEvictionArchive, restoreTenantFromArchive, generateId } from '@/lib/store';
+import { Project, Tenant, AddressEvent } from '@/types';
+import { generateId, loadAddressEvents, loadData, loadEvictionArchive, restoreTenantFromArchive } from '@/lib/store';
 import { RestoreTenantDialog } from '@/components/restore-tenant-dialog';
 import { getEvictionReasonLabel } from '@/lib/eviction-reasons';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GenderIcon } from '@/components/ui/gender-icon';
 
-interface TenantWithHistory extends Tenant {
+interface TenantCard extends Tenant {
+  projectId?: string;
   projectName: string;
+  addressId?: string;
   addressName: string;
-  roomNumber: number | string;
   currentAddress: string;
   currentRoom: string;
   isArchived?: boolean;
   evictionDate?: string;
   evictionReason?: string;
-  history: Array<{
-    projectName: string;
-    addressName: string;
-    checkInDate: string;
-    checkOutDate?: string;
-  }>;
+}
+
+interface AddressCard {
+  id: string;
+  projectId: string;
+  projectName: string;
+  name: string;
+  fullAddress: string;
+  supplierName?: string;
+  events: AddressEvent[];
 }
 
 export default function SearchScreen() {
-  const t = useTranslations();
   const colors = useColors();
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<TenantWithHistory[]>([]);
-  const [selectedTenant, setSelectedTenant] = useState<TenantWithHistory | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [events, setEvents] = useState<AddressEvent[]>([]);
+  const [query, setQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'tenants' | 'addresses'>('tenants');
   const [searchInArchive, setSearchInArchive] = useState(false);
+  const [archiveTenants, setArchiveTenants] = useState<TenantCard[]>([]);
+  const [selectedTenant, setSelectedTenant] = useState<TenantCard | null>(null);
   const [restoreDialogVisible, setRestoreDialogVisible] = useState(false);
-  const [archiveEntryId, setArchiveEntryId] = useState<string>('');
+  const [archiveEntryId, setArchiveEntryId] = useState('');
 
   useFocusEffect(
     useCallback(() => {
-      loadSearchData();
+      Promise.all([loadData(), loadAddressEvents()])
+        .then(([loadedProjects, loadedEvents]) => {
+          setProjects(loadedProjects);
+          setEvents(loadedEvents);
+        })
+        .catch((error) => console.error('Error loading search data:', error));
     }, [])
   );
 
-  const loadSearchData = async () => {
-    try {
-      const data = await loadData();
-      setProjects(data);
-    } catch (error) {
-      console.error('Error loading search data:', error);
-    }
-  };
-
-  const buildTenantHistory = (tenant: Tenant): TenantWithHistory => {
-    const history: Array<{
-      projectName: string;
-      addressName: string;
-      checkInDate: string;
-      checkOutDate?: string;
-    }> = [];
-
+  const tenantCards = useMemo(() => {
+    const cards: TenantCard[] = [];
     for (const project of projects) {
       for (const address of project.addresses) {
+        for (const tenant of address.unassignedTenants || []) {
+          cards.push({
+            ...tenant,
+            projectId: project.id,
+            projectName: project.name,
+            addressId: address.id,
+            addressName: address.name,
+            currentAddress: `${address.name}, ${address.fullAddress}`,
+            currentRoom: 'Bez miejsca',
+          });
+        }
         for (const room of address.rooms) {
           for (const space of room.spaces) {
-            if (space.tenant?.id === tenant.id) {
-              history.push({
+            if (space.tenant) {
+              cards.push({
+                ...space.tenant,
+                projectId: project.id,
                 projectName: project.name,
+                addressId: address.id,
                 addressName: address.name,
-                checkInDate: tenant.checkInDate,
+                currentAddress: `${address.name}, ${address.fullAddress}`,
+                currentRoom: `${room.name}, miejsce ${space.number}`,
               });
             }
           }
         }
       }
     }
+    return cards;
+  }, [projects]);
 
-    history.sort((a, b) => new Date(b.checkInDate).getTime() - new Date(a.checkInDate).getTime());
-
-    return {
-      ...tenant,
-      projectName: '',
-      addressName: '',
-      roomNumber: 0,
-      currentAddress: '',
-      currentRoom: '',
-      history,
-    };
-  };
-
-  const handleSearch = async (queryOverride?: string, archiveOverride?: boolean) => {
-    const query = (queryOverride !== undefined ? queryOverride : searchQuery).toLowerCase().trim();
-    const searchArchive = archiveOverride !== undefined ? archiveOverride : searchInArchive;
-
-    if (!query) {
-      setSearchResults([]);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const results: TenantWithHistory[] = [];
-
-      for (const project of projects) {
-        for (const address of project.addresses) {
-          // Check unassigned tenants
-          for (const tenant of address.unassignedTenants || []) {
-            const firstName = tenant.firstName.toLowerCase();
-            const lastName = tenant.lastName.toLowerCase();
-            const fullName = `${firstName} ${lastName}`;
-
-            if (firstName.includes(query) || lastName.includes(query) || fullName.includes(query)) {
-              const tWithHistory = buildTenantHistory(tenant);
-              tWithHistory.projectName = project.name;
-              tWithHistory.addressName = address.name;
-              tWithHistory.currentAddress = `${address.name}, ${address.fullAddress}`;
-              tWithHistory.currentRoom = 'Bez miejsca';
-              results.push(tWithHistory);
-            }
-          }
-
-          // Check assigned tenants
-          for (const room of address.rooms) {
-            for (const space of room.spaces) {
-              if (space.tenant) {
-                const firstName = space.tenant.firstName.toLowerCase();
-                const lastName = space.tenant.lastName.toLowerCase();
-                const fullName = `${firstName} ${lastName}`;
-
-                if (firstName.includes(query) || lastName.includes(query) || fullName.includes(query)) {
-                  const tenant = buildTenantHistory(space.tenant);
-                  tenant.projectName = project.name;
-                  tenant.addressName = address.name;
-                  tenant.roomNumber = space.number;
-                  tenant.currentAddress = `${address.name}, ${address.fullAddress}`;
-                  tenant.currentRoom = room.name;
-
-                  if (!results.some((r) => r.id === tenant.id)) {
-                    results.push(tenant);
-                  }
-                }
-              }
-            }
-          }
-        }
+  const addressCards = useMemo(() => {
+    const cards: AddressCard[] = [];
+    for (const project of projects) {
+      for (const address of project.addresses) {
+        cards.push({
+          id: address.id,
+          projectId: project.id,
+          projectName: project.name,
+          name: address.name,
+          fullAddress: address.fullAddress,
+          supplierName: address.supplierName,
+          events: events.filter((event) => event.addressId === address.id),
+        });
       }
-
-      if (searchArchive) {
-        const archive = await loadEvictionArchive();
-        for (const entry of archive) {
-          const firstName = entry.firstName.toLowerCase();
-          const lastName = entry.lastName.toLowerCase();
-          const fullName = `${firstName} ${lastName}`;
-
-          if (firstName.includes(query) || lastName.includes(query) || fullName.includes(query)) {
-            const archivedTenant: TenantWithHistory = {
-              id: entry.tenantId || generateId(),
-              firstName: entry.firstName || 'Nieznany',
-              lastName: entry.lastName || 'Mieszkaniec',
-              gender: entry.gender || 'male',
-              birthYear: entry.birthYear || 1995,
-              checkInDate: entry.checkInDate || '-',
-              monthlyPrice: entry.monthlyPrice || 0,
-              phone: entry.phone,
-              projectName: entry.projectName || '-',
-              addressName: entry.addressName || '-',
-              roomNumber: entry.roomName || '-',
-              currentAddress: 'Archiwum',
-              currentRoom: entry.roomName || '-',
-              isArchived: true,
-              evictionDate: entry.checkOutDate,
-              evictionReason: entry.reason,
-              history: [{
-                projectName: entry.projectName || '-',
-                addressName: entry.addressName || '-',
-                checkInDate: entry.checkInDate || '-',
-                checkOutDate: entry.checkOutDate,
-              }],
-            };
-
-            if (!results.some((r) => r.id === archivedTenant.id && r.isArchived)) {
-              results.push(archivedTenant);
-            }
-          }
-        }
-      }
-
-      setSearchResults(results);
-    } catch (error) {
-      console.error('Error searching:', error);
-      Alert.alert('Błąd', 'Nie udało się wyszukać');
-    } finally {
-      setLoading(false);
     }
-  };
+    return cards;
+  }, [projects, events]);
 
-  const handleClearResults = () => {
-    setSearchQuery('');
-    setSearchResults([]);
-    setSelectedTenant(null);
+  const filteredTenants = useMemo(() => {
+    const source = searchInArchive ? [...tenantCards, ...archiveTenants] : tenantCards;
+    const normalized = query.toLowerCase().trim();
+    if (!normalized) return source;
+    return source.filter((tenant) =>
+      `${tenant.firstName} ${tenant.lastName} ${tenant.projectName} ${tenant.addressName} ${tenant.phone || ''}`.toLowerCase().includes(normalized)
+    );
+  }, [tenantCards, archiveTenants, searchInArchive, query]);
+
+  const filteredAddresses = useMemo(() => {
+    const normalized = query.toLowerCase().trim();
+    if (!normalized) return addressCards;
+    return addressCards.filter((address) =>
+      `${address.name} ${address.fullAddress} ${address.projectName} ${address.supplierName || ''}`.toLowerCase().includes(normalized)
+    );
+  }, [addressCards, query]);
+
+  const handleLoadArchive = async () => {
+    const archive = await loadEvictionArchive();
+    const archived = archive.map((entry): TenantCard => ({
+      id: entry.id || generateId(),
+      firstName: entry.firstName || 'Nieznany',
+      lastName: entry.lastName || 'Mieszkaniec',
+      gender: entry.gender || 'male',
+      birthYear: entry.birthYear || 1995,
+      checkInDate: entry.checkInDate || '-',
+      monthlyPrice: entry.monthlyPrice || 0,
+      phone: entry.phone,
+      projectId: entry.projectId,
+      projectName: entry.projectName || '-',
+      addressId: entry.addressId,
+      addressName: entry.addressName || '-',
+      currentAddress: 'Archiwum',
+      currentRoom: entry.roomName || '-',
+      isArchived: true,
+      evictionDate: entry.checkOutDate,
+      evictionReason: entry.reason,
+    }));
+    return archived;
   };
 
   const handleRestoreTenant = async (projectId: string, addressId: string) => {
@@ -211,93 +157,94 @@ export default function SearchScreen() {
       await restoreTenantFromArchive(archiveEntryId, projectId, addressId);
       setRestoreDialogVisible(false);
       setSelectedTenant(null);
-      Alert.alert('Sukces', 'Mieszkaniec został przywrócony do projektu');
-      await loadSearchData();
-      handleClearResults();
+      Alert.alert('Sukces', 'Mieszkaniec został przywrócony do projektu.');
+      const data = await loadData();
+      setProjects(data);
     } catch (error) {
       console.error('Error restoring tenant:', error);
-      Alert.alert('Błąd', 'Nie udało się przywrócić mieszkańca');
+      Alert.alert('Błąd', 'Nie udało się przywrócić mieszkańca.');
     }
   };
 
-  const renderSearchResult = ({ item }: { item: TenantWithHistory }) => (
-    <Pressable
-      onPress={() => setSelectedTenant(item)}
-      style={({ pressed }) => ({
-        opacity: pressed ? 0.8 : 1,
-      })}
-    >
+  const renderTenant = ({ item }: { item: TenantCard }) => (
+    <Pressable onPress={() => setSelectedTenant(item)}>
       <Card className="p-4 mb-3">
         <View className="gap-2">
           <View className="flex-row justify-between items-start">
             <View className="flex-1">
               <View className="flex-row items-center gap-2">
-                <Text className="text-lg font-bold text-foreground">
-                  {item.firstName} {item.lastName}
-                </Text>
+                <Text className="text-lg font-bold text-foreground">{item.firstName} {item.lastName}</Text>
                 <GenderIcon gender={item.gender as any} showCount={false} size={14} />
               </View>
               <Text className="text-sm text-muted mt-1">{item.projectName}</Text>
             </View>
-            <View className="flex-row gap-2">
-              {item.isArchived && (
-                <Badge
-                  variant="warning"
-                  size="sm"
-                  label="Archiwum"
-                />
-              )}
+            <View className="flex-row flex-wrap gap-2 justify-end">
+              {item.status === 'do_wymeldowania' && <Badge variant="warning" size="sm" label="Do wymeldowania" />}
+              {item.isArchived && <Badge variant="default" size="sm" label="Archiwum" />}
             </View>
           </View>
-          <Text className="text-xs text-muted">Rok urodzenia: {item.birthYear}</Text>
-          <Text className="text-xs text-muted">Zameldowany: {item.checkInDate}</Text>
+          <Text className="text-xs text-muted">{item.currentAddress}</Text>
+          <Text className="text-xs text-muted">{item.currentRoom}</Text>
+        </View>
+      </Card>
+    </Pressable>
+  );
+
+  const renderAddress = ({ item }: { item: AddressCard }) => (
+    <Pressable onPress={() => router.push({ pathname: '/address-details', params: { projectId: item.projectId, addressId: item.id } })}>
+      <Card className="p-4 mb-3">
+        <View className="gap-2">
+          <View className="flex-row justify-between items-start gap-3">
+            <View className="flex-1">
+              <Text className="text-lg font-bold text-foreground">{item.name}</Text>
+              <Text className="text-sm text-muted mt-1">{item.projectName}</Text>
+            </View>
+            {!!item.supplierName && <Badge variant="supplier" size="sm" label={item.supplierName} />}
+          </View>
+          <Text className="text-xs text-muted">{item.fullAddress}</Text>
+          <Text className="text-xs text-muted">Zdarzenia: {item.events.length}</Text>
         </View>
       </Card>
     </Pressable>
   );
 
   if (selectedTenant) {
+    const history = [
+      ...(selectedTenant.residenceHistory || []).map((entry) => ({
+        title: entry.addressName,
+        date: `${entry.checkInDate} - ${entry.checkOutDate}`,
+        subtitle: entry.projectName,
+      })),
+      {
+        title: selectedTenant.currentAddress,
+        date: selectedTenant.isArchived ? `Wymeldowanie: ${selectedTenant.evictionDate}` : `Od: ${selectedTenant.checkInDate}`,
+        subtitle: selectedTenant.currentRoom,
+      },
+    ];
+
     return (
       <ScreenContainer className="p-4">
         <ScrollView showsVerticalScrollIndicator={false}>
           <View className="flex-row items-center gap-3 mb-6">
-            <Pressable
-              onPress={() => setSelectedTenant(null)}
-              className="bg-surfaceVariant rounded-full p-2"
-            >
+            <Pressable onPress={() => setSelectedTenant(null)} className="bg-surfaceVariant rounded-full p-2">
               <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
             </Pressable>
             <View className="flex-1">
-              <View className="flex-row items-center gap-2">
-                <Text className="text-2xl font-bold text-foreground">
-                  {selectedTenant.firstName} {selectedTenant.lastName}
-                </Text>
-                <GenderIcon gender={selectedTenant.gender as any} showCount={false} size={20} />
-              </View>
+              <Text className="text-2xl font-bold text-foreground">{selectedTenant.firstName} {selectedTenant.lastName}</Text>
               <Text className="text-sm text-muted mt-1">{selectedTenant.projectName}</Text>
             </View>
           </View>
 
           {selectedTenant.isArchived && (
             <Card className="p-4 mb-4 bg-warning/10 border-warning">
-              <View className="flex-row items-center justify-between mb-3">
-                <View className="flex-row items-center gap-2">
-                  <MaterialIcons name="archive" size={20} color={colors.warning} />
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1">
                   <Text className="text-warning font-bold">Mieszkaniec w archiwum</Text>
+                  <Text className="text-xs text-muted mt-1">Powód: {getEvictionReasonLabel(selectedTenant.evictionReason as any)}</Text>
                 </View>
-                <Pressable
-                  onPress={() => {
-                    setArchiveEntryId(selectedTenant.id);
-                    setRestoreDialogVisible(true);
-                  }}
-                  className="bg-warning px-3 py-1.5 rounded-lg"
-                >
+                <Pressable onPress={() => { setArchiveEntryId(selectedTenant.id); setRestoreDialogVisible(true); }} className="bg-warning px-3 py-2 rounded-lg">
                   <Text className="text-white text-xs font-bold">Przywróć</Text>
                 </Pressable>
-              </View>
-              <View className="gap-1">
-                <Text className="text-xs text-warning-foreground">Data wymeldowania: {selectedTenant.evictionDate}</Text>
-                <Text className="text-xs text-warning-foreground">Powód: {getEvictionReasonLabel(selectedTenant.evictionReason as any)}</Text>
               </View>
             </Card>
           )}
@@ -305,112 +252,84 @@ export default function SearchScreen() {
           <Card className="p-4 mb-4">
             <Text className="text-lg font-bold text-foreground mb-4">Informacje</Text>
             <View className="gap-3">
-              <View className="flex-row justify-between">
-                <Text className="text-muted">Rok urodzenia</Text>
-                <Text className="text-foreground font-medium">{selectedTenant.birthYear}</Text>
-              </View>
-              <View className="flex-row justify-between">
-                <Text className="text-muted">Płeć</Text>
-                <Text className="text-foreground font-medium">{selectedTenant.gender === 'male' ? 'Mężczyzna' : 'Kobieta'}</Text>
-              </View>
-              <View className="flex-row justify-between">
-                <Text className="text-muted">Telefon</Text>
-                <Text className="text-foreground font-medium">{selectedTenant.phone || '-'}</Text>
-              </View>
-              <View className="flex-row justify-between">
-                <Text className="text-muted">Obecny adres</Text>
-                <Text className="text-foreground font-medium text-right flex-1 ml-4">{selectedTenant.currentAddress}</Text>
-              </View>
-              <View className="flex-row justify-between">
-                <Text className="text-muted">Pokój</Text>
-                <Text className="text-foreground font-medium">{selectedTenant.currentRoom}</Text>
-              </View>
+              <Text className="text-muted">Adres: <Text className="text-foreground">{selectedTenant.currentAddress}</Text></Text>
+              <Text className="text-muted">Pokój: <Text className="text-foreground">{selectedTenant.currentRoom}</Text></Text>
+              <Text className="text-muted">Telefon: <Text className="text-foreground">{selectedTenant.phone || '-'}</Text></Text>
+              <Text className="text-muted">Stawka: <Text className="text-foreground">{selectedTenant.monthlyPrice} zł</Text></Text>
             </View>
           </Card>
 
-          <Text className="text-lg font-bold text-foreground mb-3 px-1">Historia zameldowania</Text>
-          {selectedTenant.history.map((h, i) => (
-            <Card key={i} className="p-4 mb-3">
-              <View className="flex-row justify-between items-start">
-                <View className="flex-1">
-                  <Text className="font-bold text-foreground">{h.addressName}</Text>
-                  <Text className="text-xs text-muted mt-1">{h.projectName}</Text>
-                </View>
-                <View className="items-end">
-                  <Text className="text-xs text-muted">Od: {h.checkInDate}</Text>
-                  {h.checkOutDate && <Text className="text-xs text-muted">Do: {h.checkOutDate}</Text>}
-                </View>
-              </View>
+          <Text className="text-lg font-bold text-foreground mb-3">Historia mieszkańca</Text>
+          {history.map((entry, index) => (
+            <Card key={`${entry.title}-${index}`} className="p-4 mb-3">
+              <Text className="font-bold text-foreground">{entry.title}</Text>
+              <Text className="text-xs text-muted mt-1">{entry.subtitle}</Text>
+              <Text className="text-xs text-muted mt-1">{entry.date}</Text>
             </Card>
           ))}
         </ScrollView>
-
-        <RestoreTenantDialog
-          visible={restoreDialogVisible}
-          projects={projects}
-          onClose={() => setRestoreDialogVisible(false)}
-          onRestore={handleRestoreTenant}
-        />
+        <RestoreTenantDialog visible={restoreDialogVisible} projects={projects} onClose={() => setRestoreDialogVisible(false)} onRestore={handleRestoreTenant} />
       </ScreenContainer>
     );
   }
 
   return (
     <ScreenContainer className="p-4">
-      <Text className="text-3xl font-bold text-foreground mb-6">{t.search.title}</Text>
+      <Text className="text-3xl font-bold text-foreground mb-4">Szukaj</Text>
 
       <View className="flex-row gap-2 mb-4">
-        <View className="flex-1 flex-row items-center bg-surface border border-border rounded-xl px-4">
-          <MaterialIcons name="search" size={20} color={colors.muted} />
-          <TextInput
-            className="flex-1 h-12 text-foreground ml-2"
-            placeholder={t.search.placeholder}
-            placeholderTextColor={colors.muted}
-            value={searchQuery}
-            onChangeText={(text) => {
-              setSearchQuery(text);
-              handleSearch(text);
-            }}
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={handleClearResults}>
-              <MaterialIcons name="cancel" size={20} color={colors.muted} />
-            </Pressable>
-          )}
-        </View>
+        {[
+          { value: 'tenants' as const, label: 'Mieszkańcy' },
+          { value: 'addresses' as const, label: 'Adresy' },
+        ].map((tab) => (
+          <Pressable key={tab.value} onPress={() => setActiveTab(tab.value)} className={`flex-1 py-2 rounded-lg items-center ${activeTab === tab.value ? 'bg-primary' : 'bg-surfaceVariant'}`}>
+            <Text className={`font-semibold ${activeTab === tab.value ? 'text-white' : 'text-muted'}`}>{tab.label}</Text>
+          </Pressable>
+        ))}
       </View>
 
-      <Pressable
-        onPress={() => {
-          const newValue = !searchInArchive;
-          setSearchInArchive(newValue);
-          handleSearch(searchQuery, newValue);
-        }}
-        className="flex-row items-center gap-2 mb-6 px-1"
-      >
-        <View className={`w-5 h-5 rounded border items-center justify-center ${searchInArchive ? 'bg-primary border-primary' : 'border-muted'}`}>
-          {searchInArchive && <MaterialIcons name="check" size={14} color="white" />}
-        </View>
-        <Text className="text-foreground font-medium">Szukaj w archiwum</Text>
-      </Pressable>
+      <View className="flex-row items-center bg-surface border border-border rounded-xl px-4 mb-4">
+        <MaterialIcons name="search" size={20} color={colors.muted} />
+        <TextInput className="flex-1 h-12 text-foreground ml-2" placeholder={activeTab === 'tenants' ? 'Imię, nazwisko, telefon...' : 'Adres, projekt, dostawca...'} placeholderTextColor={colors.muted} value={query} onChangeText={setQuery} />
+        {query.length > 0 && (
+          <Pressable onPress={() => setQuery('')}>
+            <MaterialIcons name="cancel" size={20} color={colors.muted} />
+          </Pressable>
+        )}
+      </View>
+
+      {activeTab === 'tenants' && (
+        <Pressable
+          onPress={async () => {
+            const next = !searchInArchive;
+            setSearchInArchive(next);
+            if (next) {
+              const archived = await handleLoadArchive();
+              setArchiveTenants(archived);
+            } else {
+              setArchiveTenants([]);
+            }
+          }}
+          className="flex-row items-center gap-2 mb-4 px-1"
+        >
+          <View className={`w-5 h-5 rounded border items-center justify-center ${searchInArchive ? 'bg-primary border-primary' : 'border-muted'}`}>
+            {searchInArchive && <MaterialIcons name="check" size={14} color="white" />}
+          </View>
+          <Text className="text-foreground font-medium">Uwzględnij archiwum</Text>
+        </Pressable>
+      )}
 
       <FlatList
-        data={searchResults}
-        renderItem={renderSearchResult}
-        keyExtractor={(item, index) => `${item.id}-${index}`}
+        data={activeTab === 'tenants' ? filteredTenants : filteredAddresses}
+        renderItem={activeTab === 'tenants' ? renderTenant as any : renderAddress as any}
+        keyExtractor={(item: any, index) => `${item.id}-${index}`}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
         ListEmptyComponent={
-          searchQuery.length > 0 ? (
-            <View className="py-20 items-center">
-              <Text className="text-muted">Nie znaleziono mieszkańców</Text>
-            </View>
-          ) : (
-            <View className="py-20 items-center">
-              <MaterialIcons name="person-search" size={64} color={colors.border} />
-              <Text className="text-muted mt-4">Wpisz imię lub nazwisko</Text>
-            </View>
-          )
+          <View className="py-20 items-center">
+            <MaterialIcons name={activeTab === 'tenants' ? 'person-search' : 'home-work'} size={64} color={colors.border} />
+            <Text className="text-muted mt-4">Brak wyników</Text>
+          </View>
         }
       />
     </ScreenContainer>

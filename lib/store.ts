@@ -1,8 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Project, Address, Room, Space, Tenant, SpaceStats, ProjectStats, Conflict, AddAddressFormData, EvictionArchiveEntry, EvictionReason, ResidenceHistoryEntry } from '@/types';
+import { Project, Address, Room, Space, Tenant, SpaceStats, ProjectStats, Conflict, AddAddressFormData, EvictionArchiveEntry, EvictionReason, ResidenceHistoryEntry, Supplier, AddressEvent, AddressEventType, PaymentModel } from '@/types';
 
 const STORAGE_KEY = 'housing_management_data';
 const EVICTION_ARCHIVE_KEY = 'eviction_archive';
+const SUPPLIERS_KEY = 'housing_suppliers';
+const ADDRESS_EVENTS_KEY = 'housing_address_events';
+
+const DEFAULT_SUPPLIERS: Supplier[] = [
+  {
+    id: 'supplier-rent-planet',
+    name: 'Rent Planet',
+    active: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'supplier-e-port',
+    name: 'E-Port',
+    active: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+];
 
 // Generate unique ID
 export const generateId = (): string => {
@@ -30,6 +47,47 @@ const compareDates = (left?: string, right?: string): number => {
   return new Date(left).getTime() - new Date(right).getTime();
 };
 
+const emptyStats = (): SpaceStats => ({
+  total: 0,
+  occupied: 0,
+  vacant: 0,
+  wypowiedzenie: 0,
+  peopleCount: 0,
+  paid: 0,
+  paidVacant: 0,
+  inactive: 0,
+  agencyCost: 0,
+  workerCharges: 0,
+  vacantLoss: 0,
+  unplannedPaidVacant: 0,
+  noticePaidVacant: 0,
+  unplannedVacantLoss: 0,
+  noticeVacantLoss: 0,
+  doWymeldowania: 0,
+  occupiedAfterNoticeEnd: 0,
+  netCost: 0,
+});
+
+const legacySupplierId = (address: Address): string | undefined => {
+  if (address.supplierId) return address.supplierId;
+  if (address.operator === 'rent_planet') return 'supplier-rent-planet';
+  if (address.operator === 'e_port') return 'supplier-e-port';
+  return undefined;
+};
+
+const legacySupplierName = (address: Address): string | undefined => {
+  if (address.supplierName) return address.supplierName;
+  if (address.operator === 'rent_planet') return 'Rent Planet';
+  if (address.operator === 'e_port') return 'E-Port';
+  if (address.operator === 'other' && address.operatorName) return address.operatorName;
+  return undefined;
+};
+
+const getPaymentModel = (address: Address): PaymentModel => {
+  if (address.paymentModel) return address.paymentModel;
+  return address.isWholeAddress ? 'whole_address' : 'per_space';
+};
+
 const getNoticePeriod = (address: Address): number => {
   return address.evictionPeriod || address.wypowiedzeniePeriod || 14;
 };
@@ -38,9 +96,39 @@ const getAddressActualSpaces = (address: Address): Space[] => {
   return (address.rooms || []).flatMap((room) => room.spaces || []);
 };
 
-const getSpaceUnitCost = (address: Address): number => {
-  const paidCapacity = Math.max(1, address.totalSpaces || getAddressActualSpaces(address).length || 1);
-  return address.totalCost > 0 ? address.totalCost / paidCapacity : address.pricePerSpace || 0;
+const getActiveRooms = (address: Address): Room[] => {
+  return (address.rooms || []).filter((room) => room.spaces.some((space) => space.status !== 'inactive'));
+};
+
+const getPaidSpaces = (address: Address): Space[] => {
+  return getAddressActualSpaces(address).filter((space) => isSpacePaid(space));
+};
+
+const getSpaceUnitCost = (address: Address, room?: Room): number => {
+  const paymentModel = getPaymentModel(address);
+
+  if (paymentModel === 'per_space') {
+    if (address.supplierPricePerSpace && address.supplierPricePerSpace > 0) {
+      return address.supplierPricePerSpace;
+    }
+    const paidCapacity = Math.max(1, address.totalSpaces || getAddressActualSpaces(address).length || 1);
+    return address.totalCost > 0 ? address.totalCost / paidCapacity : 0;
+  }
+
+  if (paymentModel === 'per_room') {
+    const roomSpaceCount = Math.max(1, room?.spaces.length || 1);
+    if (room && (room as any).supplierRoomPrice > 0) {
+      return Number((room as any).supplierRoomPrice) / roomSpaceCount;
+    }
+    if (address.supplierRoomPrice && address.supplierRoomPrice > 0) {
+      return address.supplierRoomPrice / roomSpaceCount;
+    }
+    const activeRooms = Math.max(1, getActiveRooms(address).length || 1);
+    return address.totalCost > 0 ? (address.totalCost / activeRooms) / roomSpaceCount : 0;
+  }
+
+  const paidSpaces = Math.max(1, getPaidSpaces(address).length || address.totalSpaces || 1);
+  return address.totalCost > 0 ? address.totalCost / paidSpaces : 0;
 };
 
 const isNoticeActive = (space: Space, asOf = todayISO()): boolean => {
@@ -50,6 +138,9 @@ const isNoticeActive = (space: Space, asOf = todayISO()): boolean => {
 
 const isSpacePaid = (space: Space, asOf = todayISO()): boolean => {
   if (space.status === 'inactive') return false;
+  if (space.tenant && space.status === 'wypowiedzenie' && space.wypowiedzenie) {
+    return isNoticeActive(space, asOf);
+  }
   if (space.tenant) return true;
   if (space.status === 'wypowiedzenie') return isNoticeActive(space, asOf);
   return true;
@@ -58,12 +149,14 @@ const isSpacePaid = (space: Space, asOf = todayISO()): boolean => {
 const normalizeTenant = (tenant: Tenant): Tenant => ({
   ...tenant,
   monthlyPrice: Number(tenant.monthlyPrice) || 0,
+  status: tenant.status || 'active',
   residenceHistory: tenant.residenceHistory || [],
 });
 
 const normalizeProjects = (projects: Project[]): Project[] => {
   return projects.map((project) => ({
     ...project,
+    billingType: project.billingType || 'mandate',
     addresses: (project.addresses || []).map((address) => {
       const normalizedAddress: Address = {
         ...address,
@@ -72,6 +165,9 @@ const normalizeProjects = (projects: Project[]): Project[] => {
         coupleRooms: Number(address.coupleRooms) || 0,
         evictionPeriod: getNoticePeriod(address),
         totalCost: Number(address.totalCost) || 0,
+        supplierPricePerSpace: Number(address.supplierPricePerSpace) || 0,
+        supplierRoomPrice: Number(address.supplierRoomPrice) || 0,
+        paymentModel: getPaymentModel(address),
         pricePerSpace: Number(address.pricePerSpace) || 0,
         couplePrice: Number(address.couplePrice) || 0,
         mediaFee: Number(address.mediaFee) || 0,
@@ -79,6 +175,8 @@ const normalizeProjects = (projects: Project[]): Project[] => {
         unassignedTenants: (address.unassignedTenants || []).map(normalizeTenant),
         photos: address.photos || [],
         status: address.status || 'active',
+        supplierId: legacySupplierId(address),
+        supplierName: legacySupplierName(address),
       };
 
       normalizedAddress.rooms = normalizedAddress.rooms.map((room) => ({
@@ -128,13 +226,27 @@ export const calculateSpaceStats = (spaces: Space[], address?: Address): SpaceSt
         acc.occupied++;
         acc.peopleCount++;
         acc.workerCharges += Number(space.tenant.monthlyPrice) || 0;
+        if (space.tenant.status === 'do_wymeldowania') {
+          acc.doWymeldowania++;
+        }
       } else if (paid) {
         acc.vacant++;
         acc.paidVacant++;
+        if (space.status === 'wypowiedzenie' && isNoticeActive(space)) {
+          acc.noticePaidVacant++;
+          acc.noticeVacantLoss += unitCost;
+        } else {
+          acc.unplannedPaidVacant++;
+          acc.unplannedVacantLoss += unitCost;
+        }
       }
 
       if (space.status === 'wypowiedzenie' && isNoticeActive(space)) {
         acc.wypowiedzenie++;
+      }
+
+      if (space.tenant && space.status === 'wypowiedzenie' && space.wypowiedzenie && !isNoticeActive(space)) {
+        acc.occupiedAfterNoticeEnd++;
       }
 
       acc.agencyCost += paid ? unitCost : 0;
@@ -143,20 +255,7 @@ export const calculateSpaceStats = (spaces: Space[], address?: Address): SpaceSt
 
       return acc;
     },
-    {
-      total: 0,
-      occupied: 0,
-      vacant: 0,
-      wypowiedzenie: 0,
-      peopleCount: 0,
-      paid: 0,
-      paidVacant: 0,
-      inactive: 0,
-      agencyCost: 0,
-      workerCharges: 0,
-      vacantLoss: 0,
-      netCost: 0,
-    }
+    emptyStats()
   );
 };
 
@@ -173,20 +272,7 @@ export const calculateProjectStats = (project: Project): ProjectStats => {
       }
       return acc;
     },
-    {
-      total: 0,
-      occupied: 0,
-      vacant: 0,
-      wypowiedzenie: 0,
-      peopleCount: 0,
-      paid: 0,
-      paidVacant: 0,
-      inactive: 0,
-      agencyCost: 0,
-      workerCharges: 0,
-      vacantLoss: 0,
-      netCost: 0,
-    } as SpaceStats
+    emptyStats()
   );
   
   const occupancyPercent = stats.paid > 0
@@ -201,13 +287,108 @@ export const calculateProjectStats = (project: Project): ProjectStats => {
 
 // Calculate address statistics
 export const calculateAddressStats = (address: Address): SpaceStats => {
-  const allSpaces = address.rooms.flatMap((room) => room.spaces);
-  return calculateSpaceStats(allSpaces, address);
+  const stats = emptyStats();
+
+  for (const room of address.rooms) {
+    for (const space of room.spaces) {
+      const unitCost = getSpaceUnitCost(address, room);
+      const paid = isSpacePaid(space);
+
+      stats.total++;
+      if (paid) stats.paid++;
+      if (space.status === 'inactive') stats.inactive++;
+
+      if (space.tenant) {
+        stats.occupied++;
+        stats.peopleCount++;
+        stats.workerCharges += Number(space.tenant.monthlyPrice) || 0;
+        if (space.tenant.status === 'do_wymeldowania') {
+          stats.doWymeldowania++;
+        }
+      } else if (paid) {
+        stats.vacant++;
+        stats.paidVacant++;
+        stats.vacantLoss += unitCost;
+        if (space.status === 'wypowiedzenie' && isNoticeActive(space)) {
+          stats.noticePaidVacant++;
+          stats.noticeVacantLoss += unitCost;
+        } else {
+          stats.unplannedPaidVacant++;
+          stats.unplannedVacantLoss += unitCost;
+        }
+      }
+
+      if (space.status === 'wypowiedzenie' && isNoticeActive(space)) {
+        stats.wypowiedzenie++;
+      }
+
+      if (space.tenant && space.status === 'wypowiedzenie' && space.wypowiedzenie && !isNoticeActive(space)) {
+        stats.occupiedAfterNoticeEnd++;
+      }
+
+      stats.agencyCost += paid ? unitCost : 0;
+    }
+  }
+
+  stats.netCost = stats.agencyCost - stats.workerCharges;
+  return stats;
 };
 
 // Calculate room statistics
 export const calculateRoomStats = (room: Room): SpaceStats => {
   return calculateSpaceStats(room.spaces);
+};
+
+const daysInMonth = (year: number, monthIndex: number): number => new Date(year, monthIndex + 1, 0).getDate();
+
+const clampDate = (date: Date, min: Date, max: Date): Date => {
+  if (date < min) return min;
+  if (date > max) return max;
+  return date;
+};
+
+export const calculateTenantChargeForMonth = (tenant: Tenant, project: Project, year: number, monthIndex: number): number => {
+  const monthlyPrice = Number(tenant.monthlyPrice) || 0;
+  if (monthlyPrice <= 0) return 0;
+
+  const monthStart = new Date(year, monthIndex, 1);
+  const monthEnd = new Date(year, monthIndex, daysInMonth(year, monthIndex));
+  const checkIn = new Date(tenant.checkInDate);
+  const workStart = tenant.workStartDate ? new Date(tenant.workStartDate) : checkIn;
+  const workEnd = tenant.workEndDate ? new Date(tenant.workEndDate) : undefined;
+
+  if (project.billingType === 'employment') {
+    const activeStart = clampDate(workStart, monthStart, monthEnd);
+    const activeEnd = clampDate(workEnd || monthEnd, monthStart, monthEnd);
+    if (activeEnd < monthStart || activeStart > monthEnd || activeEnd < activeStart) return 0;
+    const activeDays = Math.floor((activeEnd.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return Math.round((monthlyPrice / daysInMonth(year, monthIndex)) * activeDays * 100) / 100;
+  }
+
+  const sameCheckInMonth = checkIn.getFullYear() === year && checkIn.getMonth() === monthIndex;
+  if (sameCheckInMonth && checkIn.getDate() >= 16) {
+    return monthlyPrice / 2;
+  }
+
+  const beforeCheckIn = monthEnd < checkIn;
+  const afterEnd = workEnd && monthStart > workEnd;
+  if (beforeCheckIn || afterEnd) return 0;
+  return monthlyPrice;
+};
+
+export const calculateProjectChargesForMonth = (project: Project, year: number, monthIndex: number): number => {
+  let total = 0;
+  for (const address of project.addresses) {
+    for (const tenant of address.unassignedTenants || []) {
+      total += calculateTenantChargeForMonth(tenant, project, year, monthIndex);
+    }
+    for (const room of address.rooms) {
+      for (const space of room.spaces) {
+        if (space.tenant) total += calculateTenantChargeForMonth(space.tenant, project, year, monthIndex);
+      }
+    }
+  }
+  return Math.round(total * 100) / 100;
 };
 
 // Days remaining in wypowiedzenie
@@ -339,10 +520,23 @@ export const getConflicts = (project: Project): Conflict[] => {
         firstName: tenant.firstName,
         lastName: tenant.lastName,
         severity: 'warning' as const,
-        message: `Assign a room and place for ${tenant.firstName} ${tenant.lastName}.`,
+        message: `Przypisz pokój i miejsce dla ${tenant.firstName} ${tenant.lastName}.`,
       };
       addConflict(conflict);
       rememberTenantLocation(tenant, conflict);
+
+      if (tenant.status === 'do_wymeldowania') {
+        addConflict({
+          type: 'tenant_do_wymeldowania',
+          addressId: address.id,
+          addressName: address.name,
+          tenantId: tenant.id,
+          firstName: tenant.firstName,
+          lastName: tenant.lastName,
+          severity: 'warning',
+          message: `${tenant.firstName} ${tenant.lastName} ma status Do wymeldowania.`,
+        });
+      }
 
       if (tenant.checkOutDate && compareDates(tenant.checkOutDate, tenant.checkInDate) < 0) {
         addConflict({
@@ -368,7 +562,7 @@ export const getConflicts = (project: Project): Conflict[] => {
           tenantId: `room-${room.id}`,
           firstName: 'Room',
           lastName: room.name,
-          message: `Room ${room.name} has totalSpaces=${room.totalSpaces}, but contains ${room.spaces.length} places.`,
+          message: `Pokój ${room.name} ma licznik miejsc ${room.totalSpaces}, ale faktycznie zawiera ${room.spaces.length} miejsc.`,
         });
       }
 
@@ -387,7 +581,23 @@ export const getConflicts = (project: Project): Conflict[] => {
             spaceId: space.id,
             roomId: room.id,
             roomName: room.name,
-            message: `${tenant.firstName} ${tenant.lastName} appears in more than one active place.`,
+            message: `${tenant.firstName} ${tenant.lastName} jest aktywny w więcej niż jednym miejscu.`,
+          });
+        }
+
+        if (tenant?.status === 'do_wymeldowania') {
+          addConflict({
+            type: 'tenant_do_wymeldowania',
+            addressId: address.id,
+            addressName: address.name,
+            tenantId: tenant.id,
+            firstName: tenant.firstName,
+            lastName: tenant.lastName,
+            spaceId: space.id,
+            roomId: room.id,
+            roomName: room.name,
+            severity: 'warning',
+            message: `${tenant.firstName} ${tenant.lastName} ma status Do wymeldowania.`,
           });
         }
 
@@ -402,7 +612,7 @@ export const getConflicts = (project: Project): Conflict[] => {
             spaceId: space.id,
             roomId: room.id,
             roomName: room.name,
-            message: `${tenant.firstName} ${tenant.lastName} is placed in a bed, but tenant.spaceId is missing.`,
+            message: `${tenant.firstName} ${tenant.lastName} jest w miejscu, ale brakuje powiązania z miejscem.`,
           });
         }
 
@@ -417,7 +627,7 @@ export const getConflicts = (project: Project): Conflict[] => {
             spaceId: space.id,
             roomId: room.id,
             roomName: room.name,
-            message: `Checkout date is earlier than check-in date for ${tenant.firstName} ${tenant.lastName}.`,
+            message: `Data wymeldowania jest wcześniejsza niż data zameldowania dla ${tenant.firstName} ${tenant.lastName}.`,
           });
         }
 
@@ -432,7 +642,7 @@ export const getConflicts = (project: Project): Conflict[] => {
             spaceId: space.id,
             roomId: room.id,
             roomName: room.name,
-            message: `Place ${space.number} is inactive but still has ${tenant.firstName} ${tenant.lastName}.`,
+            message: `Miejsce ${space.number} jest nieaktywne, ale nadal ma mieszkańca ${tenant.firstName} ${tenant.lastName}.`,
           });
         }
 
@@ -447,7 +657,7 @@ export const getConflicts = (project: Project): Conflict[] => {
             spaceId: space.id,
             roomId: room.id,
             roomName: room.name,
-            message: `Place ${space.number} is marked vacant but has an active resident.`,
+            message: `Miejsce ${space.number} jest oznaczone jako wolne, ale ma aktywnego mieszkańca.`,
           });
         }
 
@@ -462,7 +672,7 @@ export const getConflicts = (project: Project): Conflict[] => {
             spaceId: space.id,
             roomId: room.id,
             roomName: room.name,
-            message: `Place ${space.number} is marked occupied but has no resident.`,
+            message: `Miejsce ${space.number} jest oznaczone jako zajęte, ale nie ma mieszkańca.`,
           });
         }
 
@@ -477,7 +687,7 @@ export const getConflicts = (project: Project): Conflict[] => {
             spaceId: space.id,
             roomId: room.id,
             roomName: room.name,
-            message: `Place ${space.number} is on notice but start or end date is missing.`,
+            message: `Miejsce ${space.number} jest na wypowiedzeniu, ale brakuje daty startu lub końca.`,
           });
         }
 
@@ -492,25 +702,26 @@ export const getConflicts = (project: Project): Conflict[] => {
             spaceId: space.id,
             roomId: room.id,
             roomName: room.name,
+            severity: tenant ? 'error' : 'warning',
             message: tenant
-              ? `Notice period has ended. Move or evict ${tenant.firstName} ${tenant.lastName}.`
-              : `Notice period has ended. Place ${space.number} should be inactive and not paid.`,
+              ? `Wypowiedzenie się skończyło. Zamów miejsce ponownie albo przenieś/wymelduj ${tenant.firstName} ${tenant.lastName}.`
+              : `Wypowiedzenie się skończyło. Miejsce ${space.number} powinno być nieaktywne i nieopłacane.`,
           });
         }
 
         if (!isWholeAddress && space.status === 'vacant' && !tenant) {
           addConflict({
-            type: 'no_room',
+            type: 'paid_vacant_without_notice',
             addressId: address.id,
             addressName: address.name,
             tenantId: 'empty-' + space.id,
-            firstName: 'Empty',
-            lastName: 'paid place',
+            firstName: 'Puste',
+            lastName: 'opłacane miejsce',
             spaceId: space.id,
             roomId: room.id,
             roomName: room.name,
             severity: 'warning',
-            message: `Empty paid place ${space.number}. Assign a worker or put it on notice to owner.`,
+            message: `Puste opłacane miejsce ${space.number} bez wypowiedzenia. Zakwateruj pracownika albo ustaw wypowiedzenie.`,
           });
         }
       }
@@ -525,7 +736,7 @@ export const getConflicts = (project: Project): Conflict[] => {
           id: generateId(),
           type: 'duplicate_tenant',
           severity: 'error',
-          message: `${location.firstName} ${location.lastName} is active in ${locations.length} places/lists at once.`,
+          message: `${location.firstName} ${location.lastName} jest aktywny w ${locations.length} miejscach/listach jednocześnie.`,
         });
       });
     }
@@ -554,6 +765,125 @@ export const saveData = async (projects: Project[]): Promise<void> => {
   } catch (error) {
     console.error('Error saving data:', error);
   }
+};
+
+const mergeDefaultSuppliers = (suppliers: Supplier[]): Supplier[] => {
+  const byName = new Map(suppliers.map((supplier) => [supplier.name.toLowerCase(), supplier]));
+  const merged = [...suppliers];
+  for (const supplier of DEFAULT_SUPPLIERS) {
+    if (!byName.has(supplier.name.toLowerCase())) {
+      merged.push(supplier);
+    }
+  }
+  return merged;
+};
+
+export const loadSuppliers = async (): Promise<Supplier[]> => {
+  try {
+    const data = await AsyncStorage.getItem(SUPPLIERS_KEY);
+    const parsed = data ? JSON.parse(data) : [];
+    return mergeDefaultSuppliers(parsed).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+  } catch (error) {
+    console.error('Error loading suppliers:', error);
+    return DEFAULT_SUPPLIERS;
+  }
+};
+
+export const saveSuppliers = async (suppliers: Supplier[]): Promise<void> => {
+  await AsyncStorage.setItem(SUPPLIERS_KEY, JSON.stringify(suppliers));
+};
+
+export const addSupplier = async (supplier: Omit<Supplier, 'id' | 'createdAt' | 'active'>): Promise<Supplier> => {
+  const suppliers = await loadSuppliers();
+  const normalizedName = supplier.name.trim();
+  if (!normalizedName) throw new Error('Nazwa dostawcy jest wymagana.');
+  const existing = suppliers.find((item) => item.name.toLowerCase() === normalizedName.toLowerCase());
+  if (existing) return existing;
+
+  const newSupplier: Supplier = {
+    id: generateId(),
+    name: normalizedName,
+    phone: supplier.phone?.trim() || undefined,
+    contactPerson: supplier.contactPerson?.trim() || undefined,
+    notes: supplier.notes?.trim() || undefined,
+    active: true,
+    createdAt: new Date().toISOString(),
+  };
+  await saveSuppliers([...suppliers, newSupplier]);
+  return newSupplier;
+};
+
+export const updateSupplier = async (supplierId: string, updates: Partial<Supplier>): Promise<void> => {
+  const suppliers = await loadSuppliers();
+  await saveSuppliers(suppliers.map((supplier) => (
+    supplier.id === supplierId ? { ...supplier, ...updates, name: updates.name?.trim() || supplier.name } : supplier
+  )));
+};
+
+export const deleteSupplier = async (supplierId: string): Promise<void> => {
+  const projects = await loadData();
+  const isUsed = projects.some((project) =>
+    project.addresses.some((address) => address.supplierId === supplierId)
+  );
+  const suppliers = await loadSuppliers();
+
+  if (isUsed) {
+    await saveSuppliers(suppliers.map((supplier) =>
+      supplier.id === supplierId ? { ...supplier, active: false } : supplier
+    ));
+    return;
+  }
+
+  await saveSuppliers(suppliers.filter((supplier) => supplier.id !== supplierId));
+};
+
+export const loadAddressEvents = async (): Promise<AddressEvent[]> => {
+  try {
+    const data = await AsyncStorage.getItem(ADDRESS_EVENTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Error loading address events:', error);
+    return [];
+  }
+};
+
+export const saveAddressEvents = async (events: AddressEvent[]): Promise<void> => {
+  await AsyncStorage.setItem(ADDRESS_EVENTS_KEY, JSON.stringify(events));
+};
+
+const addAddressEvent = async (event: Omit<AddressEvent, 'id'>): Promise<void> => {
+  const events = await loadAddressEvents();
+  events.push({ id: generateId(), ...event });
+  await saveAddressEvents(events);
+};
+
+const logSpaceEvent = async (
+  type: AddressEventType,
+  project: Project,
+  address: Address,
+  room: Room | undefined,
+  space: Space | undefined,
+  title: string,
+  date: string = todayISO(),
+  tenant?: Tenant,
+  note?: string
+) => {
+  await addAddressEvent({
+    type,
+    date,
+    projectId: project.id,
+    projectName: project.name,
+    addressId: address.id,
+    addressName: address.name,
+    roomId: room?.id,
+    roomName: room?.name,
+    spaceId: space?.id,
+    spaceNumber: space?.number,
+    tenantId: tenant?.id,
+    tenantName: tenant ? `${tenant.firstName} ${tenant.lastName}` : undefined,
+    title,
+    note,
+  });
 };
 
 // Eviction Archive functions
@@ -654,12 +984,13 @@ export const restoreTenantFromArchive = async (
 };
 
 // CRUD operations for Projects
-export const addProject = async (name: string, city?: string): Promise<Project> => {
+export const addProject = async (name: string, city?: string, billingType: Project['billingType'] = 'mandate'): Promise<Project> => {
   const projects = await loadData();
   const newProject: Project = {
     id: generateId(),
     name,
     city,
+    billingType,
     addresses: [],
   };
   projects.push(newProject);
@@ -732,6 +1063,9 @@ export const addAddress = async (projectId: string, addressData: AddAddressFormD
     phone: restAddressData.phone || '',
     evictionPeriod: restAddressData.evictionPeriod || 14,
     totalCost: restAddressData.totalCost || 0,
+    supplierPricePerSpace: restAddressData.supplierPricePerSpace || 0,
+    supplierRoomPrice: restAddressData.supplierRoomPrice || 0,
+    paymentModel: restAddressData.paymentModel || (restAddressData.isWholeAddress ? 'whole_address' : 'per_space'),
     pricePerSpace: restAddressData.pricePerSpace || 0,
     couplePrice: restAddressData.couplePrice || 0,
     mediaFee: restAddressData.mediaFee || 0,
@@ -742,6 +1076,8 @@ export const addAddress = async (projectId: string, addressData: AddAddressFormD
     isWholeAddress: restAddressData.isWholeAddress || false,
     operator: restAddressData.operator,
     operatorName: restAddressData.operatorName,
+    supplierId: restAddressData.supplierId,
+    supplierName: restAddressData.supplierName,
   };
 
   // Set addressId for rooms and spaces
@@ -1241,7 +1577,7 @@ export const evictTenant = async (
     if (!space?.tenant) continue;
 
     if (compareDates(checkoutDate, space.tenant.checkInDate) < 0) {
-      throw new Error('Data wymeldowania nie moze byc wczesniejsza niz data zameldowania.');
+      throw new Error('Data wymeldowania nie może być wcześniejsza niż data zameldowania.');
     }
 
     evictedTenant = space.tenant;
@@ -1262,21 +1598,32 @@ export const evictTenant = async (
     history.push(buildHistoryEntry(evictedTenant, project, address, room, space, checkoutDate, reason));
 
     const existingNotice = space.wypowiedzenie;
-    const period = getNoticePeriod(address);
-    const noticeStart = existingNotice?.startDate || checkoutDate;
-    const noticeEnd = existingNotice?.endDate || addDays(noticeStart, period);
-    const noticeIsFinishedAtCheckout = compareDates(noticeEnd, checkoutDate) <= 0;
+    const noticeStart = existingNotice?.startDate;
+    const noticeEnd = existingNotice?.endDate;
+    const noticeIsFinishedAtCheckout = noticeEnd ? compareDates(noticeEnd, checkoutDate) <= 0 : false;
 
     space.tenant = null;
-    space.wypowiedzenie = noticeIsFinishedAtCheckout
+    space.wypowiedzenie = !existingNotice || noticeIsFinishedAtCheckout
       ? undefined
       : {
-          startDate: noticeStart,
-          endDate: noticeEnd,
-          paidUntil: noticeEnd,
+          startDate: noticeStart || checkoutDate,
+          endDate: noticeEnd || checkoutDate,
+          paidUntil: noticeEnd || checkoutDate,
           groupedWithAddress: existingNotice?.groupedWithAddress || false,
         };
-    space.status = noticeIsFinishedAtCheckout ? 'inactive' : 'wypowiedzenie';
+    space.status = existingNotice
+      ? (noticeIsFinishedAtCheckout ? 'inactive' : 'wypowiedzenie')
+      : 'vacant';
+    await logSpaceEvent(
+      reason === 'relocation' ? 'relocation' : 'check_out',
+      project,
+      address,
+      room,
+      space,
+      reason === 'relocation' ? 'Przesiedlenie mieszkańca' : 'Wymeldowanie mieszkańca',
+      checkoutDate,
+      evictedTenant
+    );
     break;
   }
 
@@ -1285,6 +1632,130 @@ export const evictTenant = async (
   }
 
   await saveData(projects);
+};
+
+export const reorderSpace = async (
+  projectId: string,
+  addressId: string,
+  roomId: string,
+  spaceId: string
+): Promise<void> => {
+  const projects = await loadData();
+  const project = projects.find((p) => p.id === projectId);
+  if (!project) throw new Error('Project not found');
+  const address = project.addresses.find((a) => a.id === addressId);
+  if (!address) throw new Error('Address not found');
+  const room = address.rooms.find((r) => r.id === roomId);
+  if (!room) throw new Error('Room not found');
+  const space = room.spaces.find((s) => s.id === spaceId);
+  if (!space) throw new Error('Space not found');
+
+  space.wypowiedzenie = undefined;
+  space.status = space.tenant ? 'occupied' : 'vacant';
+  await saveData(projects);
+  await logSpaceEvent('place_reordered', project, address, room, space, 'Miejsce zamówione ponownie', todayISO(), space.tenant || undefined);
+};
+
+export const finishSpaceWypowiedzenie = async (
+  projectId: string,
+  addressId: string,
+  roomId: string,
+  spaceId: string
+): Promise<void> => {
+  const projects = await loadData();
+  const project = projects.find((p) => p.id === projectId);
+  if (!project) throw new Error('Project not found');
+  const address = project.addresses.find((a) => a.id === addressId);
+  if (!address) throw new Error('Address not found');
+  const room = address.rooms.find((r) => r.id === roomId);
+  if (!room) throw new Error('Room not found');
+  const space = room.spaces.find((s) => s.id === spaceId);
+  if (!space) throw new Error('Space not found');
+
+  if (space.tenant) {
+    space.status = 'wypowiedzenie';
+    space.wypowiedzenie = {
+      startDate: space.wypowiedzenie?.startDate || todayISO(),
+      endDate: todayISO(),
+      paidUntil: todayISO(),
+      groupedWithAddress: space.wypowiedzenie?.groupedWithAddress,
+    };
+  } else {
+    space.wypowiedzenie = undefined;
+    space.status = 'inactive';
+  }
+
+  await saveData(projects);
+  await logSpaceEvent('wypowiedzenie_end', project, address, room, space, 'Wypowiedzenie zakończone', todayISO(), space.tenant || undefined);
+};
+
+export const putRoomOnWypowiedzenie = async (
+  projectId: string,
+  addressId: string,
+  roomId: string,
+  startDate: string = todayISO()
+): Promise<void> => {
+  const projects = await loadData();
+  const project = projects.find((p) => p.id === projectId);
+  if (!project) throw new Error('Project not found');
+  const address = project.addresses.find((a) => a.id === addressId);
+  if (!address) throw new Error('Address not found');
+  const room = address.rooms.find((r) => r.id === roomId);
+  if (!room) throw new Error('Room not found');
+
+  const endDate = addDays(startDate, getNoticePeriod(address));
+  for (const space of room.spaces) {
+    if (space.status === 'inactive') continue;
+    space.status = 'wypowiedzenie';
+    space.wypowiedzenie = {
+      startDate,
+      endDate,
+      paidUntil: endDate,
+      groupedWithAddress: false,
+    };
+  }
+
+  await saveData(projects);
+  await logSpaceEvent('room_notice_start', project, address, room, undefined, 'Pokój ustawiony na wypowiedzenie', startDate);
+};
+
+export const updateTenantStatus = async (
+  projectId: string,
+  addressId: string,
+  tenantId: string,
+  status: Tenant['status']
+): Promise<void> => {
+  const projects = await loadData();
+  const project = projects.find((p) => p.id === projectId);
+  if (!project) throw new Error('Project not found');
+  const address = project.addresses.find((a) => a.id === addressId);
+  if (!address) throw new Error('Address not found');
+
+  const update = (tenant: Tenant) => {
+    tenant.status = status || 'active';
+    return tenant;
+  };
+
+  const unassigned = address.unassignedTenants.find((tenant) => tenant.id === tenantId);
+  if (unassigned) {
+    update(unassigned);
+    await saveData(projects);
+    await logSpaceEvent('tenant_status_changed', project, address, undefined, undefined, 'Zmieniono status mieszkańca', todayISO(), unassigned);
+    return;
+  }
+
+  for (const room of address.rooms) {
+    for (const space of room.spaces) {
+      if (space.tenant?.id === tenantId) {
+        update(space.tenant);
+        await saveData(projects);
+        await logSpaceEvent('tenant_status_changed', project, address, room, space, 'Zmieniono status mieszkańca', todayISO(), space.tenant);
+        return;
+      }
+    }
+  }
+
+  throw new Error('Tenant not found');
 };
 
 export const updateSpaceWypowiedzenieStartDate = async (
@@ -1375,6 +1846,7 @@ export const putAddressOnWypowiedzenie = async (
   }
 
   await saveData(projects);
+  await logSpaceEvent('address_notice_start', project, address, undefined, undefined, 'Adres ustawiony na wypowiedzenie', startDate);
 };
 
 export const removeAddressFromWypowiedzenie = async (
@@ -1402,6 +1874,7 @@ export const removeAddressFromWypowiedzenie = async (
   }
 
   await saveData(projects);
+  await logSpaceEvent('address_notice_cancel', project, address, undefined, undefined, 'Wypowiedzenie adresu anulowane');
 };
 
 export const applyPricesToAll = async (
@@ -1418,6 +1891,9 @@ export const applyPricesToAll = async (
 
   Object.assign(address, {
     totalCost: addressData.totalCost || 0,
+    supplierPricePerSpace: addressData.supplierPricePerSpace || 0,
+    supplierRoomPrice: addressData.supplierRoomPrice || 0,
+    paymentModel: addressData.paymentModel || 'per_space',
     pricePerSpace: addressData.pricePerSpace || 0,
     couplePrice: addressData.couplePrice || 0,
     mediaFee: addressData.mediaFee || 0,

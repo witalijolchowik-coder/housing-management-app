@@ -1,10 +1,10 @@
-import { View, Text, Pressable, Modal, ScrollView, TextInput, Switch, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useTranslations } from '@/hooks/use-translations';
-import { Address, AddAddressFormData, OperatorType } from '@/types';
-import { applyPricesToAll } from '@/lib/store';
+import { Address, AddAddressFormData, PaymentModel, Supplier } from '@/types';
+import { applyPricesToAll, loadSuppliers } from '@/lib/store';
 import { useLocalSearchParams } from 'expo-router';
 
 interface AddressFormModalProps {
@@ -14,15 +14,17 @@ interface AddressFormModalProps {
   onSave: (data: AddAddressFormData) => Promise<void>;
 }
 
-export function AddressFormModal({
-  visible,
-  address,
-  onClose,
-  onSave,
-}: AddressFormModalProps) {
+const paymentOptions: Array<{ value: PaymentModel; label: string; note: string }> = [
+  { value: 'per_space', label: 'Za miejsce', note: 'Koszt dostawcy liczony za aktywne/opłacane miejsce' },
+  { value: 'per_room', label: 'Za pokój', note: 'Koszt pokoju dzieli się na miejsca w pokoju' },
+  { value: 'whole_address', label: 'Za cały adres', note: 'Cały adres jest kosztem, dopóki jest aktywny' },
+];
+
+export function AddressFormModal({ visible, address, onClose, onSave }: AddressFormModalProps) {
   const colors = useColors();
   const t = useTranslations();
   const { projectId } = useLocalSearchParams<{ projectId: string }>();
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [formData, setFormData] = useState<AddAddressFormData>({
     name: '',
     street: '',
@@ -37,18 +39,24 @@ export function AddressFormModal({
     phone: '',
     evictionPeriod: 14,
     totalCost: 0,
+    supplierPricePerSpace: 0,
+    supplierRoomPrice: 0,
+    paymentModel: 'per_space',
     pricePerSpace: 0,
     couplePrice: 0,
     mediaFee: 450,
-    operator: 'rent_planet',
-    operatorName: '',
+    supplierId: undefined,
+    supplierName: '',
     isWholeAddress: false,
   });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (visible) {
+      loadSuppliers().then(setSuppliers).catch(() => setSuppliers([]));
+    }
+
     if (address) {
-      const regularRoomsCount = address.rooms.filter(r => r.type !== 'couple').length;
       setFormData({
         name: address.name,
         street: address.street || '',
@@ -56,22 +64,26 @@ export function AddressFormModal({
         zipCode: address.zipCode || '',
         fullAddress: address.fullAddress,
         totalSpaces: address.totalSpaces,
-        regularRooms: regularRoomsCount,
+        regularRooms: address.rooms.filter((room) => room.type !== 'couple').length,
         coupleRooms: address.coupleRooms,
         companyName: address.companyName,
         ownerName: address.ownerName,
         phone: address.phone,
         evictionPeriod: address.evictionPeriod,
         totalCost: address.totalCost,
+        supplierPricePerSpace: address.supplierPricePerSpace || 0,
+        supplierRoomPrice: address.supplierRoomPrice || 0,
+        paymentModel: address.paymentModel || (address.isWholeAddress ? 'whole_address' : 'per_space'),
         pricePerSpace: address.pricePerSpace,
         couplePrice: address.couplePrice || 0,
-        mediaFee: address.mediaFee ?? 450,
-        operator: address.operator || 'rent_planet',
-        operatorName: address.operatorName || '',
-        isWholeAddress: address.isWholeAddress || false,
+        mediaFee: address.mediaFee || 450,
+        supplierId: address.supplierId,
+        supplierName: address.supplierName || '',
+        isWholeAddress: address.isWholeAddress || address.paymentModel === 'whole_address',
       });
     } else {
-      setFormData({
+      setFormData((current) => ({
+        ...current,
         name: '',
         street: '',
         city: '',
@@ -85,25 +97,32 @@ export function AddressFormModal({
         phone: '',
         evictionPeriod: 14,
         totalCost: 0,
+        supplierPricePerSpace: 0,
+        supplierRoomPrice: 0,
+        paymentModel: 'per_space',
         pricePerSpace: 0,
         couplePrice: 0,
-        mediaFee: 450,
-        operator: 'rent_planet',
-        operatorName: '',
+        supplierId: undefined,
+        supplierName: '',
         isWholeAddress: false,
-      });
+      }));
     }
   }, [address, visible]);
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.street.trim() || !formData.city.trim()) {
-      alert('Proszę wypełнить wymagane pola (Nazwa, Ulica, Miasto)');
+      Alert.alert('Błąd', 'Wypełnij wymagane pola: nazwa, ulica i miasto.');
       return;
     }
 
-    // Construct full address for backward compatibility
+    const selectedSupplier = suppliers.find((supplier) => supplier.id === formData.supplierId);
     const fullAddress = `${formData.street}, ${formData.zipCode} ${formData.city}`.trim();
-    const dataToSave = { ...formData, fullAddress };
+    const dataToSave = {
+      ...formData,
+      fullAddress,
+      supplierName: selectedSupplier?.name,
+      isWholeAddress: formData.paymentModel === 'whole_address',
+    };
 
     try {
       setLoading(true);
@@ -111,7 +130,7 @@ export function AddressFormModal({
       onClose();
     } catch (error) {
       console.error('Error saving address:', error);
-      alert(t.messages.savingError);
+      Alert.alert('Błąd', t.messages.savingError);
     } finally {
       setLoading(false);
     }
@@ -120,377 +139,156 @@ export function AddressFormModal({
   const handleApplyToAll = async () => {
     if (!address || !projectId) return;
 
-    Alert.alert(
-      'Zastosuj do wszystkich',
-      'Czy na pewno chcesz zastosować te stawki do wszystkich mieszkańców tego adresu?',
-      [
-        { text: 'Anuluj', style: 'cancel' },
-        {
-          text: 'Tak, zastosuj',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await applyPricesToAll(projectId, address.id, formData);
-              Alert.alert('Sukces', 'Stawki zostały zastosowane do wszystkich mieszkańców');
-            } catch (error) {
-              console.error('Error applying prices:', error);
-              Alert.alert('Błąd', 'Wystąpiл błąd podczas stosowania stawek');
-            } finally {
-              setLoading(false);
-            }
+    Alert.alert('Zastosuj do wszystkich', 'Zastosować stawki mieszkańców do wszystkich osób na tym adresie?', [
+      { text: 'Anuluj', style: 'cancel' },
+      {
+        text: 'Tak',
+        onPress: async () => {
+          try {
+            setLoading(true);
+            await applyPricesToAll(projectId, address.id, formData);
+            Alert.alert('Sukces', 'Stawki zostały zastosowane.');
+          } catch (error) {
+            console.error('Error applying prices:', error);
+            Alert.alert('Błąd', 'Nie udało się zastosować stawek.');
+          } finally {
+            setLoading(false);
           }
-        }
-      ]
-    );
+        },
+      },
+    ]);
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1 bg-background"
-      >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-background">
         <View className="flex-1 pt-12 pb-4">
-          {/* Header */}
           <View className="flex-row items-center justify-between px-4 py-4 border-b border-border">
             <Pressable onPress={onClose}>
               <MaterialIcons name="close" size={24} color={colors.foreground} />
             </Pressable>
-            <Text className="text-lg font-bold text-foreground">
-              {address ? t.forms.editAddress : t.forms.addAddress}
-            </Text>
+            <Text className="text-lg font-bold text-foreground">{address ? t.forms.editAddress : t.forms.addAddress}</Text>
             <Pressable onPress={handleSave} disabled={loading}>
-              <MaterialIcons 
-                name="check" 
-                size={24} 
-                color={loading ? colors.muted : colors.primary} 
-              />
+              <MaterialIcons name="check" size={24} color={loading ? colors.muted : colors.primary} />
             </Pressable>
           </View>
 
-          {/* Form */}
           <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
-            {/* Name */}
             <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                {t.forms.name} *
-              </Text>
-              <TextInput
-                value={formData.name}
-                onChangeText={(text) => setFormData({ ...formData, name: text })}
-                placeholder={t.forms.name}
-                placeholderTextColor={colors.muted}
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                editable={!loading}
-              />
+              <Text className="text-sm font-semibold text-foreground mb-2">{t.forms.name} *</Text>
+              <TextInput value={formData.name} onChangeText={(name) => setFormData({ ...formData, name })} placeholder={t.forms.name} placeholderTextColor={colors.muted} className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
             </View>
 
-            {/* Address Block */}
             <View className="mb-6 p-4 bg-surface/50 rounded-xl border border-border">
               <Text className="text-base font-bold text-foreground mb-4">Adres</Text>
-              
-              {/* Street and House Number */}
               <View className="mb-4">
-                <Text className="text-sm font-semibold text-foreground mb-2">
-                  Ulica i numer domu *
-                </Text>
-                <TextInput
-                  value={formData.street}
-                  onChangeText={(text) => setFormData({ ...formData, street: text })}
-                  placeholder="ul. Przykładowa 12/3"
-                  placeholderTextColor={colors.muted}
-                  className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                  editable={!loading}
-                />
+                <Text className="text-sm font-semibold text-foreground mb-2">Ulica i numer domu *</Text>
+                <TextInput value={formData.street} onChangeText={(street) => setFormData({ ...formData, street })} placeholder="ul. Przykładowa 12/3" placeholderTextColor={colors.muted} className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
               </View>
-
               <View className="flex-row gap-4">
-                {/* Zip Code */}
                 <View className="flex-1">
-                  <Text className="text-sm font-semibold text-foreground mb-2">
-                    Kod pocztowy
-                  </Text>
-                  <TextInput
-                    value={formData.zipCode}
-                    onChangeText={(text) => setFormData({ ...formData, zipCode: text })}
-                    placeholder="00-000"
-                    placeholderTextColor={colors.muted}
-                    className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                    editable={!loading}
-                  />
+                  <Text className="text-sm font-semibold text-foreground mb-2">Kod</Text>
+                  <TextInput value={formData.zipCode} onChangeText={(zipCode) => setFormData({ ...formData, zipCode })} placeholder="00-000" placeholderTextColor={colors.muted} className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
                 </View>
-
-                {/* City */}
                 <View className="flex-[2]">
-                  <Text className="text-sm font-semibold text-foreground mb-2">
-                    Miasto *
-                  </Text>
-                  <TextInput
-                    value={formData.city}
-                    onChangeText={(text) => setFormData({ ...formData, city: text })}
-                    placeholder="Warszawa"
-                    placeholderTextColor={colors.muted}
-                    className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                    editable={!loading}
-                  />
+                  <Text className="text-sm font-semibold text-foreground mb-2">Miasto *</Text>
+                  <TextInput value={formData.city} onChangeText={(city) => setFormData({ ...formData, city })} placeholder="Warszawa" placeholderTextColor={colors.muted} className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
                 </View>
               </View>
             </View>
 
-            {/* Whole Address Toggle */}
-            <View className="mb-6 flex-row items-center justify-between bg-surface p-4 rounded-lg border border-border">
-              <View className="flex-1 mr-4">
-                <Text className="text-sm font-semibold text-foreground">
-                  Adres wynajmowany w całości
-                </Text>
-                <Text className="text-xs text-muted mt-1">
-                  Wyłącza powiadomienia o pustych miejscach
-                </Text>
-              </View>
-              <Switch
-                value={formData.isWholeAddress}
-                onValueChange={(value) => setFormData({ ...formData, isWholeAddress: value })}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor="#fff"
-              />
-            </View>
-
-            {/* Operator */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-3">
-                Dostawca *
-              </Text>
+            <View className="mb-6">
+              <Text className="text-sm font-semibold text-foreground mb-3">Dostawca</Text>
               <View className="gap-2">
-                <Pressable
-                  onPress={() => setFormData({ ...formData, operator: 'rent_planet' })}
-                  className={`flex-row items-center p-3 rounded-lg border ${
-                    formData.operator === 'rent_planet'
-                      ? 'bg-primary/20 border-primary'
-                      : 'bg-surface border-border'
-                  }`}
-                >
-                  <View className={`w-5 h-5 rounded-full border-2 mr-3 ${formData.operator === 'rent_planet' ? 'bg-primary border-primary' : 'border-muted'}`} />
-                  <Text className="text-foreground font-medium">Rent Planet</Text>
+                <Pressable onPress={() => setFormData({ ...formData, supplierId: undefined, supplierName: '' })} className={`p-3 rounded-lg border ${!formData.supplierId ? 'bg-primary/20 border-primary' : 'bg-surface border-border'}`}>
+                  <Text className="text-foreground font-medium">Brak dostawcy</Text>
                 </Pressable>
-
-                <Pressable
-                  onPress={() => setFormData({ ...formData, operator: 'e_port' })}
-                  className={`flex-row items-center p-3 rounded-lg border ${
-                    formData.operator === 'e_port'
-                      ? 'bg-primary/20 border-primary'
-                      : 'bg-surface border-border'
-                  }`}
-                >
-                  <View className={`w-5 h-5 rounded-full border-2 mr-3 ${formData.operator === 'e_port' ? 'bg-primary border-primary' : 'border-muted'}`} />
-                  <Text className="text-foreground font-medium">E-Port</Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => setFormData({ ...formData, operator: 'other' })}
-                  className={`flex-row items-center p-3 rounded-lg border ${
-                    formData.operator === 'other'
-                      ? 'bg-primary/20 border-primary'
-                      : 'bg-surface border-border'
-                  }`}
-                >
-                  <View className={`w-5 h-5 rounded-full border-2 mr-3 ${formData.operator === 'other' ? 'bg-primary border-primary' : 'border-muted'}`} />
-                  <Text className="text-foreground font-medium">Inny dostawca</Text>
-                </Pressable>
-
-                {formData.operator === 'other' && (
-                  <TextInput
-                    value={formData.operatorName || ''}
-                    onChangeText={(text) => setFormData({ ...formData, operatorName: text })}
-                    placeholder="Nazwa dostawcy"
-                    placeholderTextColor={colors.muted}
-                    className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground mt-2"
-                    editable={!loading}
-                  />
-                )}
+                {suppliers.filter((supplier) => supplier.active || supplier.id === formData.supplierId).map((supplier) => (
+                  <Pressable key={supplier.id} onPress={() => setFormData({ ...formData, supplierId: supplier.id, supplierName: supplier.name })} className={`p-3 rounded-lg border ${formData.supplierId === supplier.id ? 'bg-primary/20 border-primary' : 'bg-surface border-border'}`}>
+                    <Text className="text-foreground font-medium">{supplier.name}</Text>
+                    {!!supplier.contactPerson && <Text className="text-muted text-xs mt-1">{supplier.contactPerson}</Text>}
+                  </Pressable>
+                ))}
               </View>
             </View>
 
-            {/* Cena dostawcy */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Cena dostawcy
-              </Text>
-              <TextInput
-                value={formData.totalCost.toString()}
-                onChangeText={(text) => setFormData({ ...formData, totalCost: parseInt(text) || 0 })}
-                placeholder="10000"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                editable={!loading}
-              />
+            <View className="mb-6">
+              <Text className="text-sm font-semibold text-foreground mb-3">Opłata dostawcy</Text>
+              <View className="gap-2">
+                {paymentOptions.map((option) => (
+                  <Pressable key={option.value} onPress={() => setFormData({ ...formData, paymentModel: option.value, isWholeAddress: option.value === 'whole_address' })} className={`p-3 rounded-lg border ${formData.paymentModel === option.value ? 'bg-primary/20 border-primary' : 'bg-surface border-border'}`}>
+                    <Text className="text-foreground font-semibold">{option.label}</Text>
+                    <Text className="text-muted text-xs mt-1">{option.note}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
 
-            {/* Total Spaces */}
             <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Razem miejsc
-              </Text>
-              <TextInput
-                value={formData.totalSpaces.toString()}
-                onChangeText={(text) => setFormData({ ...formData, totalSpaces: parseInt(text) || 0 })}
-                placeholder="20"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                editable={!loading}
-              />
+              <Text className="text-sm font-semibold text-foreground mb-2">Cena dostawcy za całe rozliczenie</Text>
+              <TextInput value={formData.totalCost.toString()} onChangeText={(totalCost) => setFormData({ ...formData, totalCost: parseInt(totalCost) || 0 })} placeholder="3000" placeholderTextColor={colors.muted} keyboardType="number-pad" className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
             </View>
 
-            {/* Regular Rooms */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Liczba zwykłych pokoi
-              </Text>
-              <TextInput
-                value={formData.regularRooms.toString()}
-                onChangeText={(text) => setFormData({ ...formData, regularRooms: parseInt(text) || 0 })}
-                placeholder="5"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                editable={!loading}
-              />
+            <View className="flex-row gap-3 mb-4">
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-foreground mb-2">Cena dostawcy / miejsce</Text>
+                <TextInput value={(formData.supplierPricePerSpace || 0).toString()} onChangeText={(supplierPricePerSpace) => setFormData({ ...formData, supplierPricePerSpace: parseInt(supplierPricePerSpace) || 0 })} placeholder="0" placeholderTextColor={colors.muted} keyboardType="number-pad" className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-foreground mb-2">Cena dostawcy / pokój</Text>
+                <TextInput value={(formData.supplierRoomPrice || 0).toString()} onChangeText={(supplierRoomPrice) => setFormData({ ...formData, supplierRoomPrice: parseInt(supplierRoomPrice) || 0 })} placeholder="0" placeholderTextColor={colors.muted} keyboardType="number-pad" className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
+              </View>
             </View>
 
-            {/* Couple Rooms */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Liczba pokoi для par
-              </Text>
-              <TextInput
-                value={formData.coupleRooms.toString()}
-                onChangeText={(text) => setFormData({ ...formData, coupleRooms: parseInt(text) || 0 })}
-                placeholder="2"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                editable={!loading}
-              />
+            <View className="flex-row gap-3 mb-4">
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-foreground mb-2">Razem miejsc</Text>
+                <TextInput value={formData.totalSpaces.toString()} onChangeText={(totalSpaces) => setFormData({ ...formData, totalSpaces: parseInt(totalSpaces) || 0 })} placeholder="20" placeholderTextColor={colors.muted} keyboardType="number-pad" className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-foreground mb-2">Okres wyp.</Text>
+                <TextInput value={formData.evictionPeriod.toString()} onChangeText={(evictionPeriod) => setFormData({ ...formData, evictionPeriod: parseInt(evictionPeriod) || 14 })} placeholder="14" placeholderTextColor={colors.muted} keyboardType="number-pad" className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
+              </View>
             </View>
 
-            {/* Owner Name */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                {t.forms.ownerName}
-              </Text>
-              <TextInput
-                value={formData.ownerName}
-                onChangeText={(text) => setFormData({ ...formData, ownerName: text })}
-                placeholder={t.forms.ownerName}
-                placeholderTextColor={colors.muted}
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                editable={!loading}
-              />
-            </View>
+            {!address && (
+              <View className="flex-row gap-3 mb-4">
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-foreground mb-2">Zwykłe pokoje</Text>
+                  <TextInput value={formData.regularRooms.toString()} onChangeText={(regularRooms) => setFormData({ ...formData, regularRooms: parseInt(regularRooms) || 0 })} placeholder="5" placeholderTextColor={colors.muted} keyboardType="number-pad" className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-foreground mb-2">Pokoje dla par</Text>
+                  <TextInput value={formData.coupleRooms.toString()} onChangeText={(coupleRooms) => setFormData({ ...formData, coupleRooms: parseInt(coupleRooms) || 0 })} placeholder="2" placeholderTextColor={colors.muted} keyboardType="number-pad" className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
+                </View>
+              </View>
+            )}
 
-            {/* Phone */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                {t.forms.phone}
-              </Text>
-              <TextInput
-                value={formData.phone}
-                onChangeText={(text) => setFormData({ ...formData, phone: text })}
-                placeholder={t.forms.phone}
-                placeholderTextColor={colors.muted}
-                keyboardType="phone-pad"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                editable={!loading}
-              />
-            </View>
-
-            {/* Eviction Period */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                {t.forms.evictionPeriod}
-              </Text>
-              <TextInput
-                value={formData.evictionPeriod.toString()}
-                onChangeText={(text) => setFormData({ ...formData, evictionPeriod: parseInt(text) || 14 })}
-                placeholder="14"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                editable={!loading}
-              />
-            </View>
-
-            {/* Pricing Section */}
             <View className="mt-4 mb-6">
-              <Text className="text-lg font-bold text-foreground mb-4">Płata za mieszkanie</Text>
-              
+              <Text className="text-lg font-bold text-foreground mb-4">Stawki mieszkańców</Text>
               <View className="mb-4">
-                <Text className="text-sm font-semibold text-foreground mb-2">Kwota za media</Text>
-                <TextInput
-                  value={formData.mediaFee?.toString() || '450'}
-                  onChangeText={(text) => setFormData({ ...formData, mediaFee: parseInt(text) || 0 })}
-                  placeholder="450"
-                  placeholderTextColor={colors.muted}
-                  keyboardType="number-pad"
-                  className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                  editable={!loading}
-                />
+                <Text className="text-sm font-semibold text-foreground mb-2">Media</Text>
+                <TextInput value={(formData.mediaFee || 0).toString()} onChangeText={(mediaFee) => setFormData({ ...formData, mediaFee: parseInt(mediaFee) || 0 })} placeholder="450" placeholderTextColor={colors.muted} keyboardType="number-pad" className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
               </View>
-
               <View className="mb-4">
-                <Text className="text-sm font-semibold text-foreground mb-2">Cena za mieszkanie</Text>
-                <TextInput
-                  value={formData.pricePerSpace.toString()}
-                  onChangeText={(text) => setFormData({ ...formData, pricePerSpace: parseInt(text) || 0 })}
-                  placeholder="500"
-                  placeholderTextColor={colors.muted}
-                  keyboardType="number-pad"
-                  className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                  editable={!loading}
-                />
+                <Text className="text-sm font-semibold text-foreground mb-2">Cena zwykłego miejsca</Text>
+                <TextInput value={formData.pricePerSpace.toString()} onChangeText={(pricePerSpace) => setFormData({ ...formData, pricePerSpace: parseInt(pricePerSpace) || 0 })} placeholder="500" placeholderTextColor={colors.muted} keyboardType="number-pad" className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
               </View>
-
               <View className="mb-4">
-                <Text className="text-sm font-semibold text-foreground mb-2">Cena za mieszkanie – Pary</Text>
-                <TextInput
-                  value={formData.couplePrice?.toString() || '0'}
-                  onChangeText={(text) => setFormData({ ...formData, couplePrice: parseInt(text) || 0 })}
-                  placeholder="800"
-                  placeholderTextColor={colors.muted}
-                  keyboardType="number-pad"
-                  className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                  editable={!loading}
-                />
+                <Text className="text-sm font-semibold text-foreground mb-2">Cena miejsca w pokoju dla par</Text>
+                <TextInput value={(formData.couplePrice || 0).toString()} onChangeText={(couplePrice) => setFormData({ ...formData, couplePrice: parseInt(couplePrice) || 0 })} placeholder="800" placeholderTextColor={colors.muted} keyboardType="number-pad" className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground" editable={!loading} />
               </View>
-
               {address && (
-                <Pressable
-                  onPress={handleApplyToAll}
-                  disabled={loading}
-                  className="bg-primary/10 border border-primary rounded-lg py-3 items-center mt-2"
-                >
-                  <Text className="text-primary font-semibold">Zastosuj do wszystkich</Text>
+                <Pressable onPress={handleApplyToAll} disabled={loading} className="bg-primary/10 border border-primary rounded-lg py-3 items-center mt-2">
+                  <Text className="text-primary font-semibold">Zastosuj do wszystkich mieszkańców</Text>
                 </Pressable>
               )}
             </View>
           </ScrollView>
 
-          {/* Save Button */}
           <View className="border-t border-border p-4 pb-8">
-            <Pressable
-              onPress={handleSave}
-              disabled={loading}
-              className={`rounded-lg py-3 items-center ${loading ? 'bg-muted' : 'bg-primary'}`}
-            >
-              <Text className="text-white font-semibold">
-                {loading ? t.common.loading : t.forms.submit}
-              </Text>
+            <Pressable onPress={handleSave} disabled={loading} className={`rounded-lg py-3 items-center ${loading ? 'bg-muted' : 'bg-primary'}`}>
+              <Text className="text-white font-semibold">{loading ? t.common.loading : t.forms.submit}</Text>
             </Pressable>
           </View>
         </View>

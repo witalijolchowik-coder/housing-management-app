@@ -28,8 +28,8 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
-  const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
+  const initialInsets = initialWindowMetrics?.insets ? DEFAULT_WEB_INSETS;
+  const initialFrame = initialWindowMetrics?.frame ? DEFAULT_WEB_FRAME;
 
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
@@ -71,7 +71,7 @@ export default function RootLayout() {
 
   // Ensure minimum 8px padding for top and bottom on mobile
   const providerInitialMetrics = useMemo(() => {
-    const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
+    const metrics = initialWindowMetrics ? { insets: initialInsets, frame: initialFrame };
     return {
       ...metrics,
       insets: {

@@ -13,29 +13,21 @@ interface ProjectFormModalProps {
   visible: boolean;
   project?: Project;
   onClose: () => void;
-  onSave: (name: string, city?: string) => Promise<void>;
+  onSave: (name: string, city?: string, billingType?: Project['billingType']) => Promise<void>;
 }
 
-export function ProjectFormModal({
-  visible,
-  project,
-  onClose,
-  onSave,
-}: ProjectFormModalProps) {
+export function ProjectFormModal({ visible, project, onClose, onSave }: ProjectFormModalProps) {
   const colors = useColors();
   const t = useTranslations();
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
+  const [billingType, setBillingType] = useState<Project['billingType']>('mandate');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (project) {
-      setName(project.name);
-      setCity(project.city || '');
-    } else {
-      setName('');
-      setCity('');
-    }
+    setName(project?.name || '');
+    setCity(project?.city || '');
+    setBillingType(project?.billingType || 'mandate');
   }, [project, visible]);
 
   const handleSave = async () => {
@@ -46,7 +38,7 @@ export function ProjectFormModal({
 
     try {
       setLoading(true);
-      await onSave(name.trim(), city.trim() || undefined);
+      await onSave(name.trim(), city.trim() || undefined, billingType);
       onClose();
     } catch (error) {
       console.error('Error saving project:', error);
@@ -58,7 +50,7 @@ export function ProjectFormModal({
 
   const handleImportCSV = async () => {
     if (!name.trim()) {
-      Alert.alert('Błąd', 'Proszę najpierw wpisać nazwę projektu');
+      Alert.alert('Błąd', 'Najpierw wpisz nazwę projektu');
       return;
     }
 
@@ -72,15 +64,15 @@ export function ProjectFormModal({
       setLoading(true);
       const fileUri = result.assets[0].uri;
       const csvText = await FileSystem.readAsStringAsync(fileUri);
-      
       const rows = parseCSV(csvText);
+
       if (rows.length === 0) {
         Alert.alert('Błąd', 'Nie udało się odczytać danych z pliku CSV');
-        setLoading(false);
         return;
       }
 
       const newProject = processCSVData(name.trim(), city.trim() || undefined, rows);
+      newProject.billingType = billingType;
       const projects = await loadData();
       projects.push(newProject);
       await saveData(projects);
@@ -95,19 +87,15 @@ export function ProjectFormModal({
     }
   };
 
+  const billingOptions = [
+    { value: 'mandate' as const, label: 'Umowa zlecenie', note: 'Standardowo 100%, pierwszy miesiąc od 16 dnia = 50%' },
+    { value: 'employment' as const, label: 'Umowa o pracę', note: 'Naliczanie proporcjonalnie do dni trwania umowy' },
+  ];
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1 bg-background"
-      >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-background">
         <View className="flex-1 pt-12 pb-4">
-          {/* Header */}
           <View className="flex-row items-center justify-between px-4 py-4 border-b border-border">
             <Pressable onPress={onClose}>
               <MaterialIcons name="close" size={24} color={colors.foreground} />
@@ -116,21 +104,13 @@ export function ProjectFormModal({
               {project ? 'Edytuj projekt' : 'Nowy projekt'}
             </Text>
             <Pressable onPress={handleSave} disabled={loading}>
-              <MaterialIcons 
-                name="check" 
-                size={24} 
-                color={loading ? colors.muted : colors.primary} 
-              />
+              <MaterialIcons name="check" size={24} color={loading ? colors.muted : colors.primary} />
             </Pressable>
           </View>
 
-          {/* Form */}
           <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
-            {/* Project Name */}
             <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                {t.forms.name} *
-              </Text>
+              <Text className="text-sm font-semibold text-foreground mb-2">{t.forms.name} *</Text>
               <TextInput
                 value={name}
                 onChangeText={setName}
@@ -141,11 +121,8 @@ export function ProjectFormModal({
               />
             </View>
 
-            {/* City */}
             <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Miasto
-              </Text>
+              <Text className="text-sm font-semibold text-foreground mb-2">Miasto</Text>
               <TextInput
                 value={city}
                 onChangeText={setCity}
@@ -156,11 +133,25 @@ export function ProjectFormModal({
               />
             </View>
 
+            <View className="mb-6">
+              <Text className="text-sm font-semibold text-foreground mb-3">Rodzaj umowy w projekcie</Text>
+              <View className="gap-2">
+                {billingOptions.map((option) => (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setBillingType(option.value)}
+                    className={`p-3 rounded-lg border ${billingType === option.value ? 'bg-primary/20 border-primary' : 'bg-surface border-border'}`}
+                  >
+                    <Text className="text-foreground font-semibold">{option.label}</Text>
+                    <Text className="text-muted text-xs mt-1">{option.note}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
             {!project && (
-              <View className="mt-6">
-                <Text className="text-sm font-semibold text-muted mb-3 uppercase tracking-wider">
-                  Opcje zaawansowane
-                </Text>
+              <View className="mt-2">
+                <Text className="text-sm font-semibold text-muted mb-3 uppercase tracking-wider">Opcje zaawansowane</Text>
                 <Pressable
                   onPress={handleImportCSV}
                   disabled={loading}
@@ -171,23 +162,18 @@ export function ProjectFormModal({
                   </View>
                   <View className="flex-1">
                     <Text className="text-base font-bold text-foreground">Importuj z CSV</Text>
-                    <Text className="text-xs text-muted mt-1">
-                      Automatycznie utwórz adresy i dodaj mieszkańców z pliku
-                    </Text>
+                    <Text className="text-xs text-muted mt-1">Automatycznie utwórz adresy i dodaj mieszkańców z pliku</Text>
                   </View>
                 </Pressable>
               </View>
             )}
           </ScrollView>
 
-          {/* Save Button */}
           <View className="border-t border-border p-4 pb-8">
             <Pressable
               onPress={handleSave}
               disabled={loading}
-              className={`rounded-lg py-3 items-center ${
-                loading ? 'bg-muted' : 'bg-primary'
-              }`}
+              className={`rounded-lg py-3 items-center ${loading ? 'bg-muted' : 'bg-primary'}`}
             >
               <Text className="text-white font-semibold">
                 {loading ? t.common.loading : (project ? 'Zapisz zmiany' : 'Utwórz projekt')}

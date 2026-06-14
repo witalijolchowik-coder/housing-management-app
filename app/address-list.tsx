@@ -83,7 +83,7 @@ export default function AddressListScreen() {
                 if (error.message === 'HAS_RESIDENTS') {
                   Alert.alert(
                     'Błąd',
-                    'Na adresie są заселенные люди. Вначале выселите их, после чего адрес можно будет удалить.'
+                    'Na adresie są mieszkańcy. Najpierw wymelduj ich albo przenieś, a dopiero potem usuń adres.'
                   );
                 } else if (error.message === 'HAS_ACTIVE_NOTICE') {
                   Alert.alert(
@@ -186,6 +186,7 @@ export default function AddressListScreen() {
 
     // Get operator name
     const getOperatorName = () => {
+      if (item.supplierName) return item.supplierName;
       if (item.operator === 'rent_planet') return 'Rent Planet';
       if (item.operator === 'e_port') return 'E-Port';
       if (item.operator === 'other' && item.operatorName) return item.operatorName;
@@ -224,10 +225,10 @@ export default function AddressListScreen() {
                     <View className="flex-1 mr-2">
                       <View className="flex-row items-center gap-2 flex-wrap">
                         <Text className="text-lg font-bold text-foreground">{item.name}</Text>
-                        {item.operator && item.operator !== 'other' && (
+                        {(item.supplierName || (item.operator && item.operator !== 'other')) && (
                           <Badge variant="supplier" size="sm" label={getOperatorName()} />
                         )}
-                        {item.operator === 'other' && item.operatorName && (
+                        {!item.supplierName && item.operator === 'other' && item.operatorName && (
                           <Badge variant="supplier" size="sm" label={item.operatorName} />
                         )}
                       </View>

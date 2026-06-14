@@ -6,8 +6,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Project } from '@/types';
-import { loadData, loadEvictionArchive } from '@/lib/store';
+import { AddressEvent, Project } from '@/types';
+import { loadAddressEvents, loadData, loadEvictionArchive } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 
 interface CalendarEvent {
@@ -28,6 +28,7 @@ export default function CalendarScreen() {
   const cellWidth = (screenWidth - 32 - 24) / 7; // 32px padding, 24px gaps (6 * 4px)
   const [projects, setProjects] = useState<Project[]>([]);
   const [evictionArchive, setEvictionArchive] = useState<any[]>([]);
+  const [addressEvents, setAddressEvents] = useState<AddressEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -45,8 +46,10 @@ export default function CalendarScreen() {
       setLoading(true);
       const data = await loadData();
       const archive = await loadEvictionArchive();
+      const events = await loadAddressEvents();
       setProjects(data);
       setEvictionArchive(archive);
+      setAddressEvents(events);
       if (data.length > 0) {
         setSelectedProjects([data[0].id]);
       }
@@ -77,18 +80,18 @@ export default function CalendarScreen() {
                 roomName: room.name,
               });
 
-              // Wypowiedzenie end event
-              if (space.status === 'wypowiedzenie' && space.wypowiedzenie) {
-                events.push({
-                  id: `wyp-${space.id}`,
-                  date: space.wypowiedzenie.endDate,
-                  type: 'wypowiedzenie_end',
-                  projectName: project.name,
-                  addressName: address.name,
-                  tenantName: `${space.tenant.firstName} ${space.tenant.lastName}`,
-                  roomName: room.name,
-                });
-              }
+            }
+
+            if (space.status === 'wypowiedzenie' && space.wypowiedzenie) {
+              events.push({
+                id: `wyp-${space.id}`,
+                date: space.wypowiedzenie.endDate,
+                type: 'wypowiedzenie_end',
+                projectName: project.name,
+                addressName: address.name,
+                tenantName: space.tenant ? `${space.tenant.firstName} ${space.tenant.lastName}` : `Puste miejsce ${space.number}`,
+                roomName: room.name,
+              });
             }
           }
         }
@@ -107,9 +110,23 @@ export default function CalendarScreen() {
         roomName: archiveEntry.roomName || undefined,
       });
     }
+
+    for (const event of addressEvents) {
+      if (event.type === 'place_reordered') {
+        events.push({
+          id: `event-${event.id}`,
+          date: event.date,
+          type: 'check_in',
+          projectName: event.projectName,
+          addressName: event.addressName,
+          tenantName: event.tenantName || event.title,
+          roomName: event.roomName,
+        });
+      }
+    }
     
     return events;
-  }, [projects, evictionArchive]);
+  }, [projects, evictionArchive, addressEvents]);
 
   // Filter events by selected projects
   const filteredEvents = useMemo(() => {
@@ -257,7 +274,7 @@ export default function CalendarScreen() {
           <View className="gap-2">
             <View className="flex-row items-center gap-3">
               <View className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.success }} />
-              <Text className="text-sm text-foreground">Zamelowanie</Text>
+            <Text className="text-sm text-foreground">Zameldowanie</Text>
             </View>
             <View className="flex-row items-center gap-3">
               <View className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.error }} />
@@ -372,7 +389,7 @@ export default function CalendarScreen() {
                       size="sm"
                       label={
                         item.type === 'check_in'
-                          ? 'Zamelowanie'
+                          ? 'Zameldowanie'
                           : item.type === 'check_out'
                           ? 'Wymeldowanie'
                           : 'Koniec wypowiedzenia'

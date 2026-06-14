@@ -8,7 +8,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Address, Room, Space } from '@/types';
-import { loadData, getDaysRemaining, saveData, addSpace, removeSpace, updateAddressTotalSpaces } from '@/lib/store';
+import { finishSpaceWypowiedzenie, getDaysRemaining, loadData, putRoomOnWypowiedzenie, reorderSpace, saveData, addSpace, removeSpace, updateAddressTotalSpaces } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export default function RoomDetailsScreen() {
@@ -208,6 +208,54 @@ export default function RoomDetailsScreen() {
     }
   };
 
+  const handleReorderSpace = async (space: Space) => {
+    try {
+      await reorderSpace(projectId, addressId, roomId, space.id);
+      await loadRoom();
+      setSpaceMenuVisible(false);
+      setSelectedSpace(undefined);
+    } catch (error: any) {
+      Alert.alert('Błąd', error.message || 'Nie udało się zamówić miejsca ponownie.');
+    }
+  };
+
+  const handleFinishWypowiedzenie = async (space: Space) => {
+    if (space.tenant) {
+      Alert.alert(
+        'Miejsce zajęte',
+        'Na miejscu nadal mieszka pracownik. Zamów miejsce ponownie albo przenieś/wymelduj pracownika.',
+        [
+          { text: 'Anuluj', style: 'cancel' },
+          { text: 'Zamów ponownie', onPress: () => handleReorderSpace(space) },
+          { text: 'Zakończ bez zamówienia', style: 'destructive', onPress: async () => {
+            await finishSpaceWypowiedzenie(projectId, addressId, roomId, space.id);
+            await loadRoom();
+            setSpaceMenuVisible(false);
+          } },
+        ]
+      );
+      return;
+    }
+
+    try {
+      await finishSpaceWypowiedzenie(projectId, addressId, roomId, space.id);
+      await loadRoom();
+      setSpaceMenuVisible(false);
+      setSelectedSpace(undefined);
+    } catch (error: any) {
+      Alert.alert('Błąd', error.message || 'Nie udało się zakończyć wypowiedzenia.');
+    }
+  };
+
+  const handlePutRoomOnWypowiedzenie = async () => {
+    try {
+      await putRoomOnWypowiedzenie(projectId, addressId, roomId);
+      await loadRoom();
+    } catch (error: any) {
+      Alert.alert('Błąd', error.message || 'Nie udało się ustawić wypowiedzenia pokoju.');
+    }
+  };
+
   const handleAddTenant = () => {
     if (room.spaces.filter(s => !s.tenant && s.status !== 'inactive').length === 0) {
       Alert.alert('Brak wolnych miejsc', 'Wszystkie miejsca w tym pokoju są zajęte.');
@@ -259,6 +307,9 @@ export default function RoomDetailsScreen() {
                   label={status.label}
                   className=""
                 />
+                {item.tenant?.status === 'do_wymeldowania' && (
+                  <Badge variant="warning" size="sm" label="Do wymeldowania" />
+                )}
               </View>
               <Pressable
                 onPress={() => {
@@ -312,6 +363,12 @@ export default function RoomDetailsScreen() {
         <View className="flex-1 flex-row items-center justify-between">
           <Text className="text-2xl font-bold text-foreground">{room.name}</Text>
           <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={handlePutRoomOnWypowiedzenie}
+              className="bg-warning rounded-full p-2"
+            >
+              <MaterialIcons name="warning" size={24} color={colors.background} />
+            </Pressable>
             <Pressable
               onPress={handleAddSpace}
               className="bg-primary rounded-full p-2"
@@ -417,6 +474,25 @@ export default function RoomDetailsScreen() {
                   <Text className="text-warning font-medium">{t.common.putOnWypowiedzenie}</Text>
                 </Pressable>
               )
+            )}
+
+            {selectedSpace?.wypowiedzenie && (
+              <>
+                <Pressable
+                  onPress={() => handleReorderSpace(selectedSpace)}
+                  className="flex-row items-center justify-center gap-3 py-3 bg-primary/15 rounded-xl mb-2"
+                >
+                  <MaterialIcons name="add-shopping-cart" size={24} color={colors.primary} />
+                  <Text className="text-primary font-medium">Zamów ponownie</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleFinishWypowiedzenie(selectedSpace)}
+                  className="flex-row items-center justify-center gap-3 py-3 bg-surfaceVariant rounded-xl mb-2"
+                >
+                  <MaterialIcons name="stop-circle" size={24} color={colors.foreground} />
+                  <Text className="text-foreground font-medium">Zakończ wypowiedzenie</Text>
+                </Pressable>
+              </>
             )}
 
             <Pressable

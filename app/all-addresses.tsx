@@ -147,10 +147,10 @@ export default function AllAddressesScreen() {
                             Projekt: <Text className="text-foreground/70">{address.projectName}</Text>
                           </Text>
                         </View>
-                        {address.operator && address.operator !== 'other' && (
-                          <Badge variant="supplier" size="sm" label={getOperatorLabel(address.operator)} />
+                        {(address.supplierName || (address.operator && address.operator !== 'other')) && (
+                          <Badge variant="supplier" size="sm" label={address.supplierName || getOperatorLabel(address.operator)} />
                         )}
-                        {address.operator === 'other' && address.operatorName && (
+                        {!address.supplierName && address.operator === 'other' && address.operatorName && (
                           <Badge variant="supplier" size="sm" label={getOperatorLabel(address.operator, address.operatorName)} />
                         )}
                       </View>

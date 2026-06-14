@@ -9,7 +9,7 @@ import { OccupancyProgress } from '@/components/ui/occupancy-progress';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Address, Room, Tenant, Project, EvictionFormData, Space } from '@/types';
-import { loadData, calculateRoomStats, getDaysRemaining, saveData, evictTenant, updateSpaceWypowiedzenieStartDate } from '@/lib/store';
+import { loadData, calculateRoomStats, getDaysRemaining, saveData, evictTenant, updateSpaceWypowiedzenieStartDate, updateTenantStatus } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 import { EvictionFormModal } from '@/components/eviction-form-modal';
 import { GenderIcon } from '@/components/ui/gender-icon';
@@ -198,6 +198,23 @@ export default function AddressDetailsScreen() {
     }
   };
 
+  const handleToggleTenantStatus = async (tenant: Tenant) => {
+    try {
+      await updateTenantStatus(
+        projectId as string,
+        addressId as string,
+        tenant.id,
+        tenant.status === 'do_wymeldowania' ? 'active' : 'do_wymeldowania'
+      );
+      setTenantMenuVisible(false);
+      setSelectedTenant(undefined);
+      await loadAddress();
+    } catch (error) {
+      console.error('Error updating tenant status:', error);
+      Alert.alert('Błąd', 'Nie udało się zmienić statusu mieszkańca.');
+    }
+  };
+
   const handleChangeWypowiedzenieDate = async () => {
     if (!selectedRoom || !selectedSpaceForWypowiedzenie || !newWypowiedzenieStartDate) return;
     try {
@@ -258,6 +275,9 @@ export default function AddressDetailsScreen() {
                 <Text className="text-xs text-muted">{item.checkInDate}</Text>
                 {isOnWypowiedzenie && (
                   <Badge variant="warning" size="sm" label="Wyp." />
+                )}
+                {item.status === 'do_wymeldowania' && (
+                  <Badge variant="warning" size="sm" label="Do wymeldowania" />
                 )}
               </View>
             </View>
@@ -484,6 +504,18 @@ export default function AddressDetailsScreen() {
               >
                 <MaterialIcons name="delete" size={24} color={colors.error} />
                 <Text className="text-error font-medium">{t.common.delete}</Text>
+              </Pressable>
+            )}
+
+            {selectedTenant && (
+              <Pressable
+                onPress={() => handleToggleTenantStatus(selectedTenant)}
+                className="flex-row items-center justify-center gap-3 py-3 bg-surfaceVariant rounded-xl"
+              >
+                <MaterialIcons name="person-off" size={24} color={colors.primary} />
+                <Text className="text-foreground font-medium">
+                  {selectedTenant.status === 'do_wymeldowania' ? 'Cofnij Do wymeldowania' : 'Oznacz Do wymeldowania'}
+                </Text>
               </Pressable>
             )}
           </View>

@@ -74,6 +74,11 @@ export default function DashboardScreen() {
     let totalWypowiedzenie = 0;
     let totalAddresses = 0;
     let conflictCount = 0;
+    let paidVacant = 0;
+    let unplannedPaidVacant = 0;
+    let noticePaidVacant = 0;
+    let doWymeldowania = 0;
+    let vacantLoss = 0;
 
     const projectsToCalculate = activeProjectId 
       ? projects.filter(p => p.id === activeProjectId)
@@ -87,9 +92,14 @@ export default function DashboardScreen() {
       totalWypowiedzenie += stats.wypowiedzenie;
       totalAddresses += project.addresses.length;
       conflictCount += stats.conflictCount;
+      paidVacant += stats.paidVacant;
+      unplannedPaidVacant += stats.unplannedPaidVacant;
+      noticePaidVacant += stats.noticePaidVacant;
+      doWymeldowania += stats.doWymeldowania;
+      vacantLoss += stats.vacantLoss;
     }
 
-    return { totalSpaces, totalOccupied, totalVacant, totalWypowiedzenie, totalAddresses, conflictCount };
+    return { totalSpaces, totalOccupied, totalVacant, totalWypowiedzenie, totalAddresses, conflictCount, paidVacant, unplannedPaidVacant, noticePaidVacant, doWymeldowania, vacantLoss };
   };
 
   const handleProjectPress = (projectId: string) => {
@@ -122,12 +132,12 @@ export default function DashboardScreen() {
     }
   };
 
-  const handleSaveProject = async (name: string, city?: string) => {
+  const handleSaveProject = async (name: string, city?: string, billingType?: Project['billingType']) => {
     try {
       if (editingProject) {
-        await updateProject(editingProject.id, { name, city });
+        await updateProject(editingProject.id, { name, city, billingType });
       } else {
-        await addProject(name, city);
+        await addProject(name, city, billingType || 'mandate');
       }
       setEditingProject(undefined);
       await loadProjects();
@@ -178,7 +188,7 @@ export default function DashboardScreen() {
       }
     } catch (error) {
       console.error('Error importing CSV:', error);
-      Alert.alert('Błąd', 'Wystąpiл błąd podczas importu pliku CSV');
+      Alert.alert('Błąd', 'Wystąpił błąd podczas importu pliku CSV');
     }
   };
 
@@ -344,6 +354,32 @@ export default function DashboardScreen() {
               </Card>
             </Pressable>
           </View>
+
+          <View className="flex-row gap-3 mt-3">
+            <Pressable onPress={() => handleStatClick('vacant')} className="flex-1">
+              <Card className="p-4 items-center border-warning/40">
+                <MaterialIcons name="payments" size={24} color={colors.warning} />
+                <Text className="text-xs text-muted mt-1">Puste opł.</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.paidVacant}</Text>
+              </Card>
+            </Pressable>
+
+            <Pressable onPress={() => handleStatClick('conflicts')} className="flex-1">
+              <Card className="p-4 items-center border-error/40">
+                <MaterialIcons name="priority-high" size={24} color={colors.error} />
+                <Text className="text-xs text-muted mt-1">Bez wyp.</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.unplannedPaidVacant}</Text>
+              </Card>
+            </Pressable>
+
+            <Pressable onPress={() => handleStatClick('conflicts')} className="flex-1">
+              <Card className="p-4 items-center border-warning/40">
+                <MaterialIcons name="person-off" size={24} color={colors.warning} />
+                <Text className="text-xs text-muted mt-1">Do wym.</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.doWymeldowania}</Text>
+              </Card>
+            </Pressable>
+          </View>
         </View>
       )}
 
@@ -363,7 +399,11 @@ export default function DashboardScreen() {
             const hasConflicts = stats.conflictCount > 0;
             const operators = new Set<string>();
             item.addresses.forEach(address => {
-              if (address.operator) operators.add(address.operator);
+              if (address.supplierName) {
+                operators.add(address.supplierName);
+              } else if (address.operator) {
+                operators.add(address.operator);
+              }
             });
             const operatorList = Array.from(operators);
 

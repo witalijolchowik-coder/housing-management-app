@@ -4,6 +4,49 @@ export type Gender = 'male' | 'female';
 export type RoomType = 'male' | 'female' | 'couple';
 export type SpaceStatus = 'vacant' | 'occupied' | 'wypowiedzenie' | 'inactive';
 export type EvictionReason = 'job_change' | 'own_housing' | 'disciplinary' | 'relocation';
+export type PaymentModel = 'per_space' | 'per_room' | 'whole_address';
+export type BillingType = 'employment' | 'mandate';
+export type TenantStatus = 'active' | 'do_wymeldowania';
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone?: string;
+  contactPerson?: string;
+  notes?: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export type AddressEventType =
+  | 'check_in'
+  | 'check_out'
+  | 'relocation'
+  | 'wypowiedzenie_start'
+  | 'wypowiedzenie_end'
+  | 'place_reordered'
+  | 'address_notice_start'
+  | 'address_notice_cancel'
+  | 'room_notice_start'
+  | 'tenant_status_changed';
+
+export interface AddressEvent {
+  id: string;
+  type: AddressEventType;
+  date: string;
+  projectId: string;
+  projectName: string;
+  addressId: string;
+  addressName: string;
+  roomId?: string;
+  roomName?: string;
+  spaceId?: string;
+  spaceNumber?: number;
+  tenantId?: string;
+  tenantName?: string;
+  title: string;
+  note?: string;
+}
 
 export interface ResidenceHistoryEntry {
   id: string;
@@ -29,6 +72,8 @@ export interface Tenant {
   checkInDate: string; // ISO date string
   checkOutDate?: string; // ISO date string, present only in archived/history records
   workStartDate?: string;
+  workEndDate?: string;
+  status?: TenantStatus;
   spaceId?: string; // Optional - tenant can be without room
   monthlyPrice: number;
   isCouple?: boolean; // If true, uses couplePrice instead of monthlyPrice
@@ -116,6 +161,9 @@ export interface Address {
   evictionPeriod: number; // days, default 14
   wypowiedzeniePeriod?: number; // Legacy field kept for imported backups
   totalCost: number;
+  supplierPricePerSpace?: number;
+  supplierRoomPrice?: number;
+  paymentModel?: PaymentModel;
   pricePerSpace: number;
   couplePrice?: number; // Price for couple rooms
   mediaFee?: number; // Media fee
@@ -128,12 +176,15 @@ export interface Address {
   addressWypowiedzenieEnd?: string;
   operator?: OperatorType; // Operator: Rent Planet, E-Port, or Other
   operatorName?: string; // Custom operator name if operator is 'other'
+  supplierId?: string;
+  supplierName?: string;
 }
 
 export interface Project {
   id: string;
   name: string;
   city?: string;
+  billingType?: BillingType;
   addresses: Address[];
   evictionArchive?: EvictionArchive[];
 }
@@ -151,6 +202,12 @@ export interface SpaceStats {
   agencyCost: number;
   workerCharges: number;
   vacantLoss: number;
+  unplannedPaidVacant: number;
+  noticePaidVacant: number;
+  unplannedVacantLoss: number;
+  noticeVacantLoss: number;
+  doWymeldowania: number;
+  occupiedAfterNoticeEnd: number;
   netCost: number;
 }
 
@@ -160,7 +217,7 @@ export interface ProjectStats extends SpaceStats {
 }
 
 // Calendar event types
-export type CalendarEventType = 'checkin' | 'checkout' | 'wypowiedzenie_end';
+export type CalendarEventType = 'checkin' | 'checkout' | 'wypowiedzenie_end' | 'relocation' | 'reorder' | 'do_wymeldowania';
 
 export interface CalendarEvent {
   id: string;
@@ -184,6 +241,8 @@ export interface AddTenantFormData {
   birthYear: number;
   checkInDate: string;
   workStartDate?: string;
+  workEndDate?: string;
+  status?: TenantStatus;
   isCouple?: boolean;
   monthlyPrice: number;
   phone?: string;
@@ -203,17 +262,23 @@ export interface AddAddressFormData {
   phone: string;
   evictionPeriod: number;
   totalCost: number;
+  supplierPricePerSpace?: number;
+  supplierRoomPrice?: number;
+  paymentModel?: PaymentModel;
   pricePerSpace: number;
   couplePrice?: number;
   mediaFee?: number;
   operator?: OperatorType;
   operatorName?: string;
+  supplierId?: string;
+  supplierName?: string;
   isWholeAddress?: boolean;
 }
 
 export interface AddProjectFormData {
   name: string;
   city?: string;
+  billingType?: BillingType;
 }
 
 export interface EvictionFormData {
@@ -243,7 +308,10 @@ export type ConflictType =
   | 'status_mismatch'
   | 'missing_wypowiedzenie_dates'
   | 'statistics_mismatch'
-  | 'inactive_occupied';
+  | 'inactive_occupied'
+  | 'paid_vacant_without_notice'
+  | 'occupied_after_notice_end'
+  | 'tenant_do_wymeldowania';
 
 export interface Conflict {
   id: string;

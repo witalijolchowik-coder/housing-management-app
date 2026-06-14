@@ -1,25 +1,22 @@
 import { ScrollView, Text, View, Pressable, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
-import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
-import { Address, Room, Space } from '@/types';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Address, Room } from '@/types';
 import { loadData, saveData } from '@/lib/store';
 
-// Simple UUID generator
 const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = (Math.random() * 16) | 0;
+    const value = char === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
   });
 };
 
 export default function AddAddressScreen() {
-  const t = useTranslations();
   const colors = useColors();
   const router = useRouter();
 
@@ -33,60 +30,57 @@ export default function AddAddressScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    if (!name || !fullAddress || !companyName || !ownerName || !phone) {
-      Alert.alert('Błąd', 'Proszę wypełnić wszystkie wymagane pola');
+    if (!name.trim() || !fullAddress.trim() || !companyName.trim() || !ownerName.trim() || !phone.trim()) {
+      Alert.alert('Błąd', 'Wypełnij wszystkie wymagane pola.');
       return;
     }
 
-    const roomCount = parseInt(totalRooms) || 0;
+    const roomCount = parseInt(totalRooms, 10) || 0;
     if (roomCount <= 0) {
-      Alert.alert('Błąd', 'Liczba pokoi musi być więksза niż 0');
+      Alert.alert('Błąd', 'Liczba pokoi musi być większa niż 0.');
       return;
     }
 
     try {
       setLoading(true);
       const projects = await loadData();
-      
+
       if (projects.length === 0) {
-        Alert.alert('Błąd', 'Brak projektów. Proszę najpierw utworzyć projekt.');
+        Alert.alert('Błąd', 'Brak projektów. Najpierw utwórz projekt.');
         return;
       }
 
       const rooms: Room[] = [];
-      for (let i = 1; i <= roomCount; i++) {
-        const roomId = generateUUID();
-        const room: Room = {
-          id: roomId,
+      for (let index = 1; index <= roomCount; index++) {
+        rooms.push({
+          id: generateUUID(),
           addressId: '',
-          name: `Pokój ${i}`,
+          name: `Pokój ${index}`,
           type: 'male',
           totalSpaces: 0,
           spaces: [],
-        };
-        rooms.push(room);
+        });
       }
 
       const newAddress: Address = {
         id: generateUUID(),
         projectId: projects[0].id,
-        name,
-        street: fullAddress,
+        name: name.trim(),
+        street: fullAddress.trim(),
         city: '',
         zipCode: '',
-        fullAddress,
+        fullAddress: fullAddress.trim(),
         totalSpaces: 0,
-        coupleRooms: parseInt(coupleRooms) || 0,
-        companyName,
-        ownerName,
-        phone,
+        coupleRooms: parseInt(coupleRooms, 10) || 0,
+        companyName: companyName.trim(),
+        ownerName: ownerName.trim(),
+        phone: phone.trim(),
         evictionPeriod: 14,
         totalCost: 0,
+        supplierPricePerSpace: 0,
+        paymentModel: 'per_space',
         pricePerSpace: 0,
-        rooms: rooms.map((r) => ({
-          ...r,
-          addressId: '',
-        })),
+        rooms,
         unassignedTenants: [],
         photos: [],
       };
@@ -98,11 +92,11 @@ export default function AddAddressScreen() {
       projects[0].addresses.push(newAddress);
       await saveData(projects);
 
-      Alert.alert('Sukces', `Adres dodany z ${roomCount} pokojami`);
+      Alert.alert('Sukces', `Adres dodany z ${roomCount} pokojami.`);
       router.back();
     } catch (error) {
       console.error('Error adding address:', error);
-      Alert.alert('Błąd', 'Nie udało się dodać adresu');
+      Alert.alert('Błąd', 'Nie udało się dodać adresu.');
     } finally {
       setLoading(false);
     }
@@ -125,16 +119,10 @@ export default function AddAddressScreen() {
 
   return (
     <ScreenContainer className="p-4 pt-12 pb-20">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
           <View className="flex-row items-center gap-3 mb-6">
-            <Pressable
-              onPress={() => router.back()}
-              className="bg-surfaceVariant rounded-full p-2"
-            >
+            <Pressable onPress={() => router.back()} className="bg-surfaceVariant rounded-full p-2">
               <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
             </Pressable>
             <Text className="text-2xl font-bold text-foreground flex-1">Dodaj adres</Text>
@@ -165,7 +153,7 @@ export default function AddAddressScreen() {
             />
 
             <FormField
-              label="Pokoje dla par (opcjonalnie)"
+              label="Pokoje dla par"
               value={coupleRooms}
               onChangeText={setCoupleRooms}
               placeholder="0"
@@ -195,16 +183,14 @@ export default function AddAddressScreen() {
 
             <View className="bg-surface rounded-lg p-3 border border-primary/30">
               <Text className="text-xs text-muted">
-                💡 Po utworzeniu adresu pojawi się {totalRooms || '0'} pokoi: Pokój 1, Pokój 2, itd. Możesz je edytować lub usuwać.
+                Po utworzeniu adresu pojawi się {totalRooms || '0'} pokoi: Pokój 1, Pokój 2 itd. Możesz je potem edytować lub usuwać.
               </Text>
             </View>
 
             <Pressable
               onPress={handleSubmit}
               disabled={loading}
-              style={({ pressed }) => ({
-                opacity: pressed ? 0.9 : 1,
-              })}
+              style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
               className="bg-primary rounded-lg px-6 py-4 items-center mt-4"
             >
               <Text className="text-background font-semibold text-base">
