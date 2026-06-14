@@ -45,14 +45,14 @@ export default function EvictionsDetailScreen() {
       addressName: string;
       roomId: string;
       roomName: string;
-      tenant: Tenant;
+      tenant?: Tenant;
       endDate: string;
     }> = [];
 
     for (const address of project.addresses) {
       for (const room of address.rooms) {
         for (const space of room.spaces) {
-          if (space.tenant && space.wypowiedzenie) {
+          if (space.wypowiedzenie && space.status !== 'inactive') {
             evictions.push({
               projectId: project.id,
               projectName: project.name,
@@ -60,7 +60,7 @@ export default function EvictionsDetailScreen() {
               addressName: address.name,
               roomId: room.id,
               roomName: room.name,
-              tenant: space.tenant,
+              tenant: space.tenant || undefined,
               endDate: space.wypowiedzenie.endDate,
             });
           }
@@ -188,7 +188,7 @@ export default function EvictionsDetailScreen() {
                                     <View className="flex-row items-center gap-2">
                                       <MaterialIcons name="person" size={16} color={colors.success} />
                                       <Text className="text-sm text-foreground">
-                                        {eviction.tenant.firstName} {eviction.tenant.lastName}
+                                      {eviction.tenant ? `${eviction.tenant.firstName} ${eviction.tenant.lastName}` : `Puste miejsce`}
                                       </Text>
                                     </View>
 

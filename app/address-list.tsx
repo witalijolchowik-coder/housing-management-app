@@ -85,6 +85,11 @@ export default function AddressListScreen() {
                     'Błąd',
                     'Na adresie są заселенные люди. Вначале выселите их, после чего адрес можно будет удалить.'
                   );
+                } else if (error.message === 'HAS_ACTIVE_NOTICE') {
+                  Alert.alert(
+                    'Nie mozna usunac adresu',
+                    'Adres ma aktywne wypowiedzenie. Do konca tego okresu miejsca nadal sa oplacane.'
+                  );
                 } else {
                   console.error('Error deleting address:', error);
                 }
@@ -140,7 +145,7 @@ export default function AddressListScreen() {
 
   const renderAddressCard = ({ item }: { item: Address }) => {
     const stats = calculateAddressStats(item);
-    const occupancyPercent = stats.total > 0 ? Math.round((stats.occupied / stats.total) * 100) : 0;
+    const occupancyPercent = stats.paid > 0 ? Math.round((stats.occupied / stats.paid) * 100) : 0;
     const hasEvictions = stats.wypowiedzenie > 0;
     
     // Count actual tenants (not spaces)
@@ -162,7 +167,7 @@ export default function AddressListScreen() {
     for (const room of item.rooms) {
       const roomType = room.type || 'other';
       const roomTotal = room.totalSpaces;
-      const roomVacant = room.spaces.filter(s => s.status === 'vacant').length;
+      const roomVacant = room.spaces.filter(s => !s.tenant && s.status !== 'inactive').length;
 
       if (roomType === 'male') {
         genderStats.male.total += roomTotal;
@@ -220,10 +225,10 @@ export default function AddressListScreen() {
                       <View className="flex-row items-center gap-2 flex-wrap">
                         <Text className="text-lg font-bold text-foreground">{item.name}</Text>
                         {item.operator && item.operator !== 'other' && (
-                          <Badge variant="outline" size="sm" label={getOperatorName()} className="border-blue-400 text-blue-300" />
+                          <Badge variant="outline" size="sm" label={getOperatorName()} className="border-primary text-primary" />
                         )}
                         {item.operator === 'other' && item.operatorName && (
-                          <Badge variant="outline" size="sm" label={item.operatorName} className="border-blue-400 text-blue-300" />
+                          <Badge variant="outline" size="sm" label={item.operatorName} className="border-primary text-primary" />
                         )}
                       </View>
                       {/* Full Address on next row */}
@@ -294,7 +299,7 @@ export default function AddressListScreen() {
             <View className="gap-3 pt-3 border-t border-border/30">
               <View className="flex-row justify-between items-center">
                 <Text className="text-sm text-muted">
-                  {stats.occupied + stats.wypowiedzenie}/{stats.total} {t.addressList.occupied}
+                  {stats.occupied}/{stats.paid} {t.addressList.occupied}
                 </Text>
                 <Text className="text-sm font-semibold text-primary">{occupancyPercent}%</Text>
               </View>

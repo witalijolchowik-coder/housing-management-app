@@ -113,9 +113,10 @@ export default function AddressDetailsScreen() {
     }
   };
 
-  const handleEvictTenant = async (formData: EvictionFormData) => {
+  const handleEvictTenant = async (formData: EvictionFormData & { targetAddressId?: string }) => {
     if (!selectedTenant || !project || !address) return;
     try {
+      const previousSpace = getTenantSpace(selectedTenant.id);
       await evictTenant(
         project.id,
         address.id,
@@ -123,6 +124,40 @@ export default function AddressDetailsScreen() {
         formData.checkoutDate,
         formData.reason
       );
+
+      if (formData.reason === 'relocation' && formData.targetAddressId) {
+        const projects = await loadData();
+        const targetProject = projects.find((p) => p.id === project.id);
+        const targetAddress = targetProject?.addresses.find((a) => a.id === formData.targetAddressId);
+        if (targetAddress) {
+          targetAddress.unassignedTenants.push({
+            ...selectedTenant,
+            spaceId: undefined,
+            checkInDate: formData.checkoutDate,
+            checkOutDate: undefined,
+            residenceHistory: previousSpace
+              ? [
+                  ...(selectedTenant.residenceHistory || []),
+                  {
+                    id: `${selectedTenant.id}-${previousSpace.space.id}-${formData.checkoutDate}`,
+                    projectId: project.id,
+                    projectName: project.name,
+                    addressId: address.id,
+                    addressName: address.name,
+                    roomId: previousSpace.room.id,
+                    roomName: previousSpace.room.name,
+                    spaceId: previousSpace.space.id,
+                    spaceNumber: previousSpace.space.number,
+                    checkInDate: selectedTenant.checkInDate,
+                    checkOutDate: formData.checkoutDate,
+                    reason: 'relocation',
+                  },
+                ]
+              : selectedTenant.residenceHistory || [],
+          });
+          await saveData(projects);
+        }
+      }
       Alert.alert('Sukces', 'Mieszkaniec został wymeldowany i przeniesiony do archiwum');
       setEvictionModalVisible(false);
       setTenantMenuVisible(false);
@@ -530,6 +565,9 @@ export default function AddressDetailsScreen() {
 
       <EvictionFormModal
         visible={evictionModalVisible}
+        tenant={selectedTenant}
+        projectAddresses={project?.addresses || []}
+        currentAddressId={address.id}
         onClose={() => setEvictionModalVisible(false)}
         onSave={handleEvictTenant}
       />

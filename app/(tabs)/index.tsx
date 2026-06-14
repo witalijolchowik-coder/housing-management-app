@@ -81,7 +81,7 @@ export default function DashboardScreen() {
 
     for (const project of projectsToCalculate) {
       const stats = calculateProjectStats(project);
-      totalSpaces += stats.total;
+      totalSpaces += stats.paid;
       totalOccupied += stats.occupied;
       totalVacant += stats.vacant;
       totalWypowiedzenie += stats.wypowiedzenie;
@@ -400,7 +400,7 @@ export default function DashboardScreen() {
                           <View className="flex-row flex-wrap items-center gap-2 mt-1">
                             <Text className="text-sm text-muted">{item.city}</Text>
                             {operatorList.length > 0 && operatorList.map((operator) => (
-                               <Badge key={operator} variant="outline" size="sm" label={getOperatorLabel(operator)} className="border-blue-400" textClassName="text-blue-300 font-medium" />
+                               <Badge key={operator} variant="outline" size="sm" label={getOperatorLabel(operator)} className="border-primary text-primary" />
                             ))}
                           </View>
                         )}
@@ -430,7 +430,7 @@ export default function DashboardScreen() {
                       <View className="flex-row justify-between items-center">
                         <Text className="text-4xl font-bold text-primary">{stats.occupancyPercent}%</Text>
                         <Text className="text-sm text-muted">
-                          {stats.occupied}/{stats.total} {t.addressList.occupied}
+                          {stats.occupied}/{stats.paid} {t.addressList.occupied}
                         </Text>
                       </View>
                       <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />
