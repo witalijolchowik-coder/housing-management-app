@@ -148,19 +148,17 @@ export default function AllAddressesScreen() {
                           </Text>
                         </View>
                         {address.operator && address.operator !== 'other' && (
-                          <Badge variant="outline" size="sm" label={getOperatorLabel(address.operator)} className="border-blue-400" textClassName="text-blue-300 font-medium" />
+                          <Badge variant="supplier" size="sm" label={getOperatorLabel(address.operator)} />
                         )}
                         {address.operator === 'other' && address.operatorName && (
-                          <Badge variant="outline" size="sm" label={getOperatorLabel(address.operator, address.operatorName)} className="border-blue-400" textClassName="text-blue-300 font-medium" />
+                          <Badge variant="supplier" size="sm" label={getOperatorLabel(address.operator, address.operatorName)} />
                         )}
                       </View>
 
                       <View className="flex-row items-center gap-4 mt-2 pt-2 border-t border-border/20">
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                          <GenderIcon gender="male" count={stats.male} size={16} showCount={true} />
-                          <GenderIcon gender="female" count={stats.female} size={16} showCount={true} />
-                          <GenderIcon gender="couple" count={stats.couples} size={16} showCount={true} />
-                        </View>
+                        <GenderIcon gender="male" count={stats.male} size={14} showCount={true} />
+                        <GenderIcon gender="female" count={stats.female} size={14} showCount={true} />
+                        <GenderIcon gender="couple" count={stats.couples} size={14} showCount={true} />
                       </View>
                     </Card>
                   </Pressable>

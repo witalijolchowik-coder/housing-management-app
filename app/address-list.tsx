@@ -225,10 +225,10 @@ export default function AddressListScreen() {
                       <View className="flex-row items-center gap-2 flex-wrap">
                         <Text className="text-lg font-bold text-foreground">{item.name}</Text>
                         {item.operator && item.operator !== 'other' && (
-                          <Badge variant="outline" size="sm" label={getOperatorName()} className="border-primary text-primary" />
+                          <Badge variant="supplier" size="sm" label={getOperatorName()} />
                         )}
                         {item.operator === 'other' && item.operatorName && (
-                          <Badge variant="outline" size="sm" label={item.operatorName} className="border-primary text-primary" />
+                          <Badge variant="supplier" size="sm" label={item.operatorName} />
                         )}
                       </View>
                       {/* Full Address on next row */}
