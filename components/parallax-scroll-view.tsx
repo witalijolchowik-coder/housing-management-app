@@ -63,7 +63,7 @@ export default function ParallaxScrollView({
         style={[
           {
             overflow: "hidden",
-            backgroundColor: headerBackgroundColor ? colors.primary,
+            backgroundColor: headerBackgroundColor ?? colors.primary,
             height: headerHeight,
             paddingTop: insets.top,
           },
