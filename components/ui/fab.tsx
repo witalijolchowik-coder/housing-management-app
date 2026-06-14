@@ -40,7 +40,7 @@ export function FAB({
       className={cn(
         sizeConfig.button,
         'rounded-full bg-primary items-center justify-center',
-        'absolute shadow-xl',
+        'absolute shadow-xl z-50',
         position === 'center' ? 'self-center' : 'right-6'
       )}
     >

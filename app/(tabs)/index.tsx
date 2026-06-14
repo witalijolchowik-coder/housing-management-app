@@ -400,7 +400,7 @@ export default function DashboardScreen() {
                           <View className="flex-row flex-wrap items-center gap-2 mt-1">
                             <Text className="text-sm text-muted">{item.city}</Text>
                             {operatorList.length > 0 && operatorList.map((operator) => (
-                               <Badge key={operator} variant="outline" size="sm" label={getOperatorLabel(operator)} className="border-primary text-primary" />
+                               <Badge key={operator} variant="supplier" size="sm" label={getOperatorLabel(operator)} />
                             ))}
                           </View>
                         )}
@@ -448,7 +448,7 @@ export default function DashboardScreen() {
         )}
       </ScrollView>
 
-      <FAB icon="add" onPress={() => { setEditingProject(undefined); setFormVisible(true); }} />
+      <FAB icon="add" bottom={-28} onPress={() => { setEditingProject(undefined); setFormVisible(true); }} />
 
       <ProjectMenuModal
         visible={menuVisible}
