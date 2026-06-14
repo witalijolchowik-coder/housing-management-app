@@ -81,7 +81,7 @@ export default function DashboardScreen() {
 
     for (const project of projectsToCalculate) {
       const stats = calculateProjectStats(project);
-      totalSpaces += stats.total;
+      totalSpaces += stats.paid;
       totalOccupied += stats.occupied;
       totalVacant += stats.vacant;
       totalWypowiedzenie += stats.wypowiedzenie;
@@ -430,7 +430,7 @@ export default function DashboardScreen() {
                       <View className="flex-row justify-between items-center">
                         <Text className="text-4xl font-bold text-primary">{stats.occupancyPercent}%</Text>
                         <Text className="text-sm text-muted">
-                          {stats.occupied}/{stats.total} {t.addressList.occupied}
+                          {stats.occupied}/{stats.paid} {t.addressList.occupied}
                         </Text>
                       </View>
                       <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />

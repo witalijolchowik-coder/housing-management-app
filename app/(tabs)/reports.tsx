@@ -117,7 +117,7 @@ export default function ReportsScreen() {
                       <View className="flex-row justify-between items-center">
                         <Text className="text-2xl font-bold text-primary">{stats.occupancyPercent}%</Text>
                         <Text className="text-sm text-muted">
-                          {stats.occupied}/{stats.total} zajęte
+                          {stats.occupied}/{stats.paid} zajęte
                         </Text>
                       </View>
                       <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />

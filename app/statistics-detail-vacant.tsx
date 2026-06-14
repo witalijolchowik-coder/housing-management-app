@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Project } from '@/types';
-import { loadData, calculateProjectStats } from '@/lib/store';
+import { loadData, calculateAddressStats, calculateProjectStats } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 
@@ -45,24 +45,14 @@ export default function VacantDetailScreen() {
     }> = [];
 
     for (const address of project.addresses) {
-      let totalSpaces = 0;
-      let occupied = 0;
-
-      for (const room of address.rooms) {
-        for (const space of room.spaces) {
-          totalSpaces++;
-          if (space.status === 'occupied' || space.status === 'wypowiedzenie') {
-            occupied++;
-          }
-        }
-      }
+      const stats = calculateAddressStats(address);
 
       addresses.push({
         id: address.id,
         name: address.name,
-        totalSpaces,
-        occupied,
-        vacant: totalSpaces - occupied,
+        totalSpaces: stats.paid,
+        occupied: stats.occupied,
+        vacant: stats.vacant,
       });
     }
 

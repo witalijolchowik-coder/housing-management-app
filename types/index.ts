@@ -2,8 +2,23 @@
 
 export type Gender = 'male' | 'female';
 export type RoomType = 'male' | 'female' | 'couple';
-export type SpaceStatus = 'vacant' | 'occupied' | 'wypowiedzenie';
+export type SpaceStatus = 'vacant' | 'occupied' | 'wypowiedzenie' | 'inactive';
 export type EvictionReason = 'job_change' | 'own_housing' | 'disciplinary' | 'relocation';
+
+export interface ResidenceHistoryEntry {
+  id: string;
+  projectId: string;
+  projectName: string;
+  addressId: string;
+  addressName: string;
+  roomId?: string;
+  roomName?: string;
+  spaceId?: string;
+  spaceNumber?: number;
+  checkInDate: string;
+  checkOutDate: string;
+  reason?: EvictionReason | 'relocation';
+}
 
 export interface Tenant {
   id: string;
@@ -12,10 +27,12 @@ export interface Tenant {
   gender: Gender;
   birthYear: number;
   checkInDate: string; // ISO date string
+  checkOutDate?: string; // ISO date string, present only in archived/history records
   workStartDate?: string;
   spaceId?: string; // Optional - tenant can be without room
   monthlyPrice: number;
   isCouple?: boolean; // If true, uses couplePrice instead of monthlyPrice
+  residenceHistory?: ResidenceHistoryEntry[];
   photo?: string;
   phone?: string;
 }
@@ -39,6 +56,8 @@ export interface EvictionArchive {
   reason: EvictionReason;
   createdAt: string;
 }
+
+export type EvictionArchiveEntry = EvictionArchive;
 
 export interface Wypowiedzenie {
   startDate: string; // ISO date string
@@ -95,6 +114,7 @@ export interface Address {
   ownerName: string;
   phone: string;
   evictionPeriod: number; // days, default 14
+  wypowiedzeniePeriod?: number; // Legacy field kept for imported backups
   totalCost: number;
   pricePerSpace: number;
   couplePrice?: number; // Price for couple rooms
@@ -105,6 +125,7 @@ export interface Address {
   status?: 'active' | 'wypowiedzenie'; // Address-level status
   isWholeAddress?: boolean; // If true, address is rented as a whole
   addressWypowiedzienieStart?: string; // When address was put on wypowiedzenie
+  addressWypowiedzenieEnd?: string;
   operator?: OperatorType; // Operator: Rent Planet, E-Port, or Other
   operatorName?: string; // Custom operator name if operator is 'other'
 }
@@ -119,11 +140,18 @@ export interface Project {
 
 // Computed statistics
 export interface SpaceStats {
-  total: number;
-  occupied: number;
-  vacant: number;
-  wypowiedzenie: number;
+  total: number; // Physical places in rooms
+  occupied: number; // Places with an active resident
+  vacant: number; // Empty but still paid places
+  wypowiedzenie: number; // Places currently in notice period
   peopleCount: number; // Actual number of people (for occupancy display)
+  paid: number; // Places still paid by the agency
+  paidVacant: number; // Empty paid places causing losses
+  inactive: number; // Places handed back to owner and no longer paid
+  agencyCost: number;
+  workerCharges: number;
+  vacantLoss: number;
+  netCost: number;
 }
 
 export interface ProjectStats extends SpaceStats {
@@ -207,7 +235,15 @@ export interface AddRoomFormData {
 }
 
 // Conflict types
-export type ConflictType = 'no_room' | 'wypowiedzenie_overdue';
+export type ConflictType =
+  | 'no_room'
+  | 'wypowiedzenie_overdue'
+  | 'duplicate_tenant'
+  | 'invalid_dates'
+  | 'status_mismatch'
+  | 'missing_wypowiedzenie_dates'
+  | 'statistics_mismatch'
+  | 'inactive_occupied';
 
 export interface Conflict {
   id: string;
@@ -220,5 +256,8 @@ export interface Conflict {
   firstName: string;
   lastName: string;
   spaceId?: string;
+  roomId?: string;
+  roomName?: string;
+  severity?: 'warning' | 'error';
   message: string;
 }

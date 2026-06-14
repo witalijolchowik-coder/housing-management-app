@@ -51,6 +51,18 @@ export default function TenantDetailsScreen() {
             const unassignedTenant = addr.unassignedTenants?.find((t) => t.id === tenantId);
             if (unassignedTenant) {
               foundTenant = unassignedTenant;
+              foundLocations.push(...(unassignedTenant.residenceHistory || []).map((entry) => ({
+                projectId: entry.projectId,
+                projectName: entry.projectName,
+                addressId: entry.addressId,
+                addressName: entry.addressName,
+                roomId: entry.roomId,
+                roomName: entry.roomName,
+                spaceNumber: entry.spaceNumber,
+                checkInDate: entry.checkInDate,
+                checkOutDate: entry.checkOutDate,
+                isCurrent: false,
+              })));
               if (projectId === project.id && addressId === addr.id) {
                 foundCurrentLocation = {
                   projectId: project.id,
@@ -66,10 +78,22 @@ export default function TenantDetailsScreen() {
             // Check assigned tenants in rooms
             for (const room of addr.rooms) {
               for (const space of room.spaces) {
-                if (space.tenant?.id === tenantId) {
-                  foundTenant = space.tenant;
+                  if (space.tenant?.id === tenantId) {
+                    foundTenant = space.tenant;
+                    foundLocations.push(...(space.tenant.residenceHistory || []).map((entry) => ({
+                      projectId: entry.projectId,
+                      projectName: entry.projectName,
+                      addressId: entry.addressId,
+                      addressName: entry.addressName,
+                      roomId: entry.roomId,
+                      roomName: entry.roomName,
+                      spaceNumber: entry.spaceNumber,
+                      checkInDate: entry.checkInDate,
+                      checkOutDate: entry.checkOutDate,
+                      isCurrent: false,
+                    })));
 
-                  const location: TenantLocation = {
+                    const location: TenantLocation = {
                     projectId: project.id,
                     projectName: project.name,
                     addressId: addr.id,

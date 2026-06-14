@@ -69,6 +69,14 @@ export default function RoomDetailsScreen() {
   };
 
   const getSpaceStatus = (space: Space): { label: string; color: string; icon: string } => {
+    if (space.status === 'inactive') {
+      return {
+        label: 'Nieaktywne',
+        color: 'bg-muted',
+        icon: 'block',
+      };
+    }
+
     if (space.wypowiedzenie) {
       const daysRemaining = getDaysRemaining(space.wypowiedzenie.endDate);
       if (space.tenant) {
@@ -172,7 +180,7 @@ export default function RoomDetailsScreen() {
             const s = r.spaces.find((sp) => sp.id === space.id);
             if (s) {
               if (putOn) {
-                const wypowiedzenieDays = addr.wypowiedzeniePeriod || 14;
+                const wypowiedzenieDays = addr.evictionPeriod || addr.wypowiedzeniePeriod || 14;
                 const startDate = new Date();
                 const endDate = new Date(startDate);
                 endDate.setDate(endDate.getDate() + wypowiedzenieDays);
@@ -201,7 +209,7 @@ export default function RoomDetailsScreen() {
   };
 
   const handleAddTenant = () => {
-    if (room.spaces.filter(s => !s.tenant).length === 0) {
+    if (room.spaces.filter(s => !s.tenant && s.status !== 'inactive').length === 0) {
       Alert.alert('Brak wolnych miejsc', 'Wszystkie miejsca w tym pokoju są zajęte.');
       return;
     }
@@ -283,7 +291,7 @@ export default function RoomDetailsScreen() {
                   <Text className="text-sm font-semibold text-warning">{daysRemaining} dni</Text>
                 </View>
                 <ProgressBar
-                  progress={Math.max(0, (daysRemaining / 14) * 100)}
+                  progress={Math.max(0, (daysRemaining / (address.evictionPeriod || address.wypowiedzeniePeriod || 14)) * 100)}
                   color="bg-warning"
                 />
               </View>
