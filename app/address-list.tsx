@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, FlatList, Pressable, Image, Alert } from 'react-native';
+import { Text, View, FlatList, Pressable, Image, Alert, Modal } from 'react-native';
 import { useEffect, useState, useCallback } from 'react';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
@@ -11,8 +11,9 @@ import { AddressFormModal } from '@/components/address-form-modal';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Address, AddAddressFormData, OperatorType, Room } from '@/types';
-import { loadData, calculateAddressStats, addAddress, updateAddress, deleteAddress, putAddressOnWypowiedzenie, removeAddressFromWypowiedzenie } from '@/lib/store';
+import { loadData, calculateAddressStats, addAddress, updateAddress, deleteAddress, putAddressOnWypowiedzenie, removeAddressFromWypowiedzenie, updateAddressWypowiedzenieDates, isSpacePaid } from '@/lib/store';
 import { MaterialIcons } from '@expo/vector-icons';
+import { DatePicker } from '@/components/ui/date-picker';
 
 export default function AddressListScreen() {
   const t = useTranslations();
@@ -25,6 +26,9 @@ export default function AddressListScreen() {
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [formVisible, setFormVisible] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | undefined>();
+  const [wypowiedzenieDatesVisible, setWypowiedzenieDatesVisible] = useState(false);
+  const [addressNoticeStartDate, setAddressNoticeStartDate] = useState('');
+  const [addressNoticeEndDate, setAddressNoticeEndDate] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -124,6 +128,33 @@ export default function AddressListScreen() {
     }
   };
 
+  const handleOpenAddressWypowiedzenieDates = () => {
+    if (!selectedAddress) return;
+    const noticeSpace = selectedAddress.rooms
+      .flatMap((room) => room.spaces)
+      .find((space) => space.wypowiedzenie?.groupedWithAddress || space.wypowiedzenie);
+    setAddressNoticeStartDate(selectedAddress.addressWypowiedzienieStart || noticeSpace?.wypowiedzenie?.startDate || '');
+    setAddressNoticeEndDate(selectedAddress.addressWypowiedzenieEnd || noticeSpace?.wypowiedzenie?.endDate || '');
+    setWypowiedzenieDatesVisible(true);
+  };
+
+  const handleSaveAddressWypowiedzenieDates = async () => {
+    if (!selectedAddress) return;
+    try {
+      await updateAddressWypowiedzenieDates(
+        projectId as string,
+        selectedAddress.id,
+        addressNoticeStartDate,
+        addressNoticeEndDate,
+      );
+      setWypowiedzenieDatesVisible(false);
+      setSelectedAddress(null);
+      await loadAddresses();
+    } catch (error: any) {
+      Alert.alert('Błąd', error.message || 'Nie udało się zapisać dat wypowiedzenia.');
+    }
+  };
+
   const handleSaveAddress = async (data: AddAddressFormData) => {
     try {
       if (editingAddress) {
@@ -158,29 +189,22 @@ export default function AddressListScreen() {
     
     // Calculate gender-based stats
     const genderStats = {
-      male: { total: 0, vacant: 0 },
-      female: { total: 0, vacant: 0 },
-      couple: { total: 0, vacant: 0 },
-      other: { total: 0, vacant: 0 },
+      male: { vacantPaid: 0, vacantTotal: 0 },
+      female: { vacantPaid: 0, vacantTotal: 0 },
+      couple: { vacantPaid: 0, vacantTotal: 0 },
+      other: { vacantPaid: 0, vacantTotal: 0 },
     };
 
     for (const room of item.rooms) {
       const roomType = room.type || 'other';
-      const roomTotal = room.totalSpaces;
-      const roomVacant = room.spaces.filter(s => !s.tenant && s.status !== 'inactive').length;
+      const bucket = roomType === 'male' || roomType === 'female' || roomType === 'couple' ? roomType : 'other';
 
-      if (roomType === 'male') {
-        genderStats.male.total += roomTotal;
-        genderStats.male.vacant += roomVacant;
-      } else if (roomType === 'female') {
-        genderStats.female.total += roomTotal;
-        genderStats.female.vacant += roomVacant;
-      } else if (roomType === 'couple') {
-        genderStats.couple.total += roomTotal;
-        genderStats.couple.vacant += roomVacant;
-      } else {
-        genderStats.other.total += roomTotal;
-        genderStats.other.vacant += roomVacant;
+      for (const space of room.spaces) {
+        if (space.tenant || space.status === 'inactive') continue;
+        genderStats[bucket].vacantTotal++;
+        if (isSpacePaid(space)) {
+          genderStats[bucket].vacantPaid++;
+        }
       }
     }
 
@@ -260,36 +284,29 @@ export default function AddressListScreen() {
             <View className="pt-2 border-t border-border/30">
               <Text className="text-xs font-bold text-muted mb-2 uppercase tracking-wider">Wolne miejsca</Text>
               <View className="flex-row flex-wrap gap-x-4 gap-y-2">
-                {/* Male */}
                 <View className="flex-row items-center gap-1.5">
-                  <Text className="text-base">♂️</Text>
+                  <MaterialIcons name="male" size={18} color={colors.primary} />
                   <Text className="text-sm font-bold text-foreground">
-                    {genderStats.male.vacant} <Text className="text-muted font-normal">({genderStats.male.total})</Text>
+                    {genderStats.male.vacantPaid} <Text className="text-muted font-normal">({genderStats.male.vacantTotal})</Text>
                   </Text>
                 </View>
-                
-                {/* Female */}
                 <View className="flex-row items-center gap-1.5">
-                  <Text className="text-base">♀️</Text>
+                  <MaterialIcons name="female" size={18} color={colors.error} />
                   <Text className="text-sm font-bold text-foreground">
-                    {genderStats.female.vacant} <Text className="text-muted font-normal">({genderStats.female.total})</Text>
+                    {genderStats.female.vacantPaid} <Text className="text-muted font-normal">({genderStats.female.vacantTotal})</Text>
                   </Text>
                 </View>
-
-                {/* Couple */}
                 <View className="flex-row items-center gap-1.5">
-                  <Text className="text-base">❤️</Text>
+                  <MaterialIcons name="favorite" size={16} color={colors.warning} />
                   <Text className="text-sm font-bold text-foreground">
-                    {genderStats.couple.vacant} <Text className="text-muted font-normal">({genderStats.couple.total})</Text>
+                    {genderStats.couple.vacantPaid} <Text className="text-muted font-normal">({genderStats.couple.vacantTotal})</Text>
                   </Text>
                 </View>
-
-                {/* Other/Undefined */}
-                {genderStats.other.total > 0 && (
+                {genderStats.other.vacantTotal > 0 && (
                   <View className="flex-row items-center gap-1.5">
-                    <Text className="text-base">⚧️</Text>
+                    <MaterialIcons name="help-outline" size={16} color={colors.muted} />
                     <Text className="text-sm font-bold text-foreground">
-                      {genderStats.other.vacant} <Text className="text-muted font-normal">({genderStats.other.total})</Text>
+                      {genderStats.other.vacantPaid} <Text className="text-muted font-normal">({genderStats.other.vacantTotal})</Text>
                     </Text>
                   </View>
                 )}
@@ -370,6 +387,7 @@ export default function AddressListScreen() {
         onDelete={handleDeleteAddress}
         onWypowiedzenie={handleWypowiedzenie}
         onRemoveWypowiedzenie={handleRemoveWypowiedzenie}
+        onEditWypowiedzenieDates={handleOpenAddressWypowiedzenieDates}
       />
 
       <AddressFormModal
@@ -381,6 +399,42 @@ export default function AddressListScreen() {
         }}
         onSave={handleSaveAddress}
       />
+
+      <Modal
+        visible={wypowiedzenieDatesVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setWypowiedzenieDatesVisible(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/50 justify-center items-center p-4"
+          onPress={() => setWypowiedzenieDatesVisible(false)}
+        >
+          <Pressable className="bg-surface w-full max-w-sm p-6 rounded-2xl gap-4">
+            <Text className="text-lg font-bold text-foreground text-center">
+              Daty wypowiedzenia adresu
+            </Text>
+            <DatePicker
+              value={addressNoticeStartDate}
+              onChange={setAddressNoticeStartDate}
+              label="Data rozpoczęcia"
+              placeholder="Wybierz datę"
+            />
+            <DatePicker
+              value={addressNoticeEndDate}
+              onChange={setAddressNoticeEndDate}
+              label="Data zakończenia"
+              placeholder="Wybierz datę"
+            />
+            <Pressable
+              onPress={handleSaveAddressWypowiedzenieDates}
+              className="bg-primary py-3 rounded-xl items-center"
+            >
+              <Text className="text-white font-semibold">Zapisz</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }

@@ -12,6 +12,7 @@ interface AddressMenuModalProps {
   onDelete: () => void;
   onWypowiedzenie: () => void;
   onRemoveWypowiedzenie: () => void;
+  onEditWypowiedzenieDates?: () => void;
 }
 
 export function AddressMenuModal({
@@ -22,6 +23,7 @@ export function AddressMenuModal({
   onDelete,
   onWypowiedzenie,
   onRemoveWypowiedzenie,
+  onEditWypowiedzenieDates,
 }: AddressMenuModalProps) {
   const colors = useColors();
   const t = useTranslations();
@@ -77,16 +79,30 @@ export function AddressMenuModal({
                   <Text className="text-foreground ml-3 flex-1">Postaw na wypowiedzenie</Text>
                 </Pressable>
               ) : (
-                <Pressable
-                  onPress={() => {
-                    onRemoveWypowiedzenie();
-                    onClose();
-                  }}
-                  className="flex-row items-center px-4 py-3 border-b border-border"
-                >
-                  <MaterialIcons name="check-circle" size={20} color={colors.success} />
-                  <Text className="text-foreground ml-3 flex-1">Zdejmij z wypowiedzenia</Text>
-                </Pressable>
+                <>
+                  {onEditWypowiedzenieDates && (
+                    <Pressable
+                      onPress={() => {
+                        onEditWypowiedzenieDates();
+                        onClose();
+                      }}
+                      className="flex-row items-center px-4 py-3 border-b border-border"
+                    >
+                      <MaterialIcons name="event" size={20} color={colors.warning} />
+                      <Text className="text-foreground ml-3 flex-1">Zmień daty wypowiedzenia</Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    onPress={() => {
+                      onRemoveWypowiedzenie();
+                      onClose();
+                    }}
+                    className="flex-row items-center px-4 py-3 border-b border-border"
+                  >
+                    <MaterialIcons name="check-circle" size={20} color={colors.success} />
+                    <Text className="text-foreground ml-3 flex-1">Zdejmij z wypowiedzenia</Text>
+                  </Pressable>
+                </>
               )}
 
               {/* Delete */}

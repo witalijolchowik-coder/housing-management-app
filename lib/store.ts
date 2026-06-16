@@ -136,7 +136,7 @@ const isNoticeActive = (space: Space, asOf = todayISO()): boolean => {
   return compareDates(space.wypowiedzenie.endDate, asOf) >= 0;
 };
 
-const isSpacePaid = (space: Space, asOf = todayISO()): boolean => {
+export const isSpacePaid = (space: Space, asOf = todayISO()): boolean => {
   if (space.status === 'inactive') return false;
   if (space.tenant && space.status === 'wypowiedzenie' && space.wypowiedzenie) {
     return isNoticeActive(space, asOf);
@@ -1766,37 +1766,48 @@ export const updateSpaceWypowiedzenieStartDate = async (
   newStartDate: string
 ): Promise<void> => {
   const projects = await loadData();
-  const projectIndex = projects.findIndex((p) => p.id === projectId);
-  if (projectIndex === -1) throw new Error('Project not found');
+  const project = projects.find((p) => p.id === projectId);
+  if (!project) throw new Error('Project not found');
+  const address = project.addresses.find((a) => a.id === addressId);
+  if (!address) throw new Error('Address not found');
+  const endDate = addDays(newStartDate, getNoticePeriod(address));
+  await updateSpaceWypowiedzenieDates(projectId, addressId, roomId, spaceId, newStartDate, endDate);
+};
 
-  const addressIndex = projects[projectIndex].addresses.findIndex((a) => a.id === addressId);
-  if (addressIndex === -1) throw new Error('Address not found');
-
-  const address = projects[projectIndex].addresses[addressIndex];
-
-  const roomIndex = address.rooms.findIndex((r) => r.id === roomId);
-  if (roomIndex === -1) throw new Error('Room not found');
-
-  const room = address.rooms[roomIndex];
-  const spaceIndex = room.spaces.findIndex((s) => s.id === spaceId);
-
-  if (spaceIndex === -1) throw new Error('Space not found');
-
-  const space = room.spaces[spaceIndex];
-
-  if (!space.wypowiedzenie) {
-    throw new Error('Space is not on wypowiedzenie');
+export const updateSpaceWypowiedzenieDates = async (
+  projectId: string,
+  addressId: string,
+  roomId: string,
+  spaceId: string,
+  newStartDate: string,
+  newEndDate: string
+): Promise<void> => {
+  if (!isValidDateString(newStartDate) || !isValidDateString(newEndDate)) {
+    throw new Error('Nieprawidłowa data wypowiedzenia.');
+  }
+  if (compareDates(newEndDate, newStartDate) < 0) {
+    throw new Error('Data końca wypowiedzenia nie może być wcześniejsza niż data startu.');
   }
 
-  const wypowiedzeniePeriod = getNoticePeriod(address);
-  const startDate = new Date(newStartDate);
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + wypowiedzeniePeriod);
+  const projects = await loadData();
+  const project = projects.find((p) => p.id === projectId);
+  if (!project) throw new Error('Project not found');
+
+  const address = project.addresses.find((a) => a.id === addressId);
+  if (!address) throw new Error('Address not found');
+
+  const room = address.rooms.find((r) => r.id === roomId);
+  if (!room) throw new Error('Room not found');
+
+  const space = room.spaces.find((s) => s.id === spaceId);
+  if (!space?.wypowiedzenie) throw new Error('Space is not on wypowiedzenie');
 
   space.wypowiedzenie.startDate = newStartDate;
-  space.wypowiedzenie.endDate = endDate.toISOString().split('T')[0];
+  space.wypowiedzenie.endDate = newEndDate;
+  space.wypowiedzenie.paidUntil = newEndDate;
 
   await saveData(projects);
+  await logSpaceEvent('wypowiedzenie_start', project, address, room, space, 'Zmieniono daty wypowiedzenia miejsca', todayISO(), space.tenant || undefined);
 };
 
 export const updateAddressTotalSpaces = async (
@@ -1875,6 +1886,43 @@ export const removeAddressFromWypowiedzenie = async (
 
   await saveData(projects);
   await logSpaceEvent('address_notice_cancel', project, address, undefined, undefined, 'Wypowiedzenie adresu anulowane');
+};
+
+export const updateAddressWypowiedzenieDates = async (
+  projectId: string,
+  addressId: string,
+  newStartDate: string,
+  newEndDate: string
+): Promise<void> => {
+  if (!isValidDateString(newStartDate) || !isValidDateString(newEndDate)) {
+    throw new Error('Nieprawidłowa data wypowiedzenia.');
+  }
+  if (compareDates(newEndDate, newStartDate) < 0) {
+    throw new Error('Data końca wypowiedzenia nie może być wcześniejsza niż data startu.');
+  }
+
+  const projects = await loadData();
+  const project = projects.find((p) => p.id === projectId);
+  if (!project) throw new Error('Project not found');
+
+  const address = project.addresses.find((a) => a.id === addressId);
+  if (!address) throw new Error('Address not found');
+  if (address.status !== 'wypowiedzenie') throw new Error('Adres nie jest na wypowiedzeniu.');
+
+  address.addressWypowiedzienieStart = newStartDate;
+  address.addressWypowiedzenieEnd = newEndDate;
+
+  for (const room of address.rooms) {
+    for (const space of room.spaces) {
+      if (!space.wypowiedzenie?.groupedWithAddress) continue;
+      space.wypowiedzenie.startDate = newStartDate;
+      space.wypowiedzenie.endDate = newEndDate;
+      space.wypowiedzenie.paidUntil = newEndDate;
+    }
+  }
+
+  await saveData(projects);
+  await logSpaceEvent('address_notice_start', project, address, undefined, undefined, 'Zmieniono daty wypowiedzenia adresu', todayISO());
 };
 
 export const applyPricesToAll = async (
