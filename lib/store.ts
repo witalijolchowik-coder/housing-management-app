@@ -275,8 +275,8 @@ export const calculateProjectStats = (project: Project): ProjectStats => {
     emptyStats()
   );
   
-  const occupancyPercent = stats.paid > 0
-    ? Math.round((stats.occupied / stats.paid) * 100)
+  const occupancyPercent = stats.total > 0
+    ? Math.round((stats.occupied / stats.total) * 100)
     : 0;
   
   const conflicts = getConflicts(project);
@@ -709,21 +709,6 @@ export const getConflicts = (project: Project): Conflict[] => {
           });
         }
 
-        if (!isWholeAddress && space.status === 'vacant' && !tenant) {
-          addConflict({
-            type: 'paid_vacant_without_notice',
-            addressId: address.id,
-            addressName: address.name,
-            tenantId: 'empty-' + space.id,
-            firstName: 'Puste',
-            lastName: 'opłacane miejsce',
-            spaceId: space.id,
-            roomId: room.id,
-            roomName: room.name,
-            severity: 'warning',
-            message: `Puste opłacane miejsce ${space.number} bez wypowiedzenia. Zakwateruj pracownika albo ustaw wypowiedzenie.`,
-          });
-        }
       }
     }
   }

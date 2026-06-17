@@ -244,6 +244,42 @@ export default function RoomDetailsScreen() {
     }
   };
 
+  const handleCancelSpaceWypowiedzenie = async () => {
+    if (!selectedSpace) return;
+
+    Alert.alert(
+      'Anuluj wypowiedzenie',
+      'Czy na pewno anulować wypowiedzenie tego miejsca?',
+      [
+        { text: 'Nie', style: 'cancel' },
+        {
+          text: 'Anuluj wypowiedzenie',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const projects = await loadData();
+              const project = projects.find((item) => item.id === projectId);
+              const addr = project?.addresses.find((item) => item.id === addressId);
+              const targetRoom = addr?.rooms.find((item) => item.id === roomId);
+              const targetSpace = targetRoom?.spaces.find((item) => item.id === selectedSpace.id);
+              if (!targetSpace) return;
+
+              targetSpace.wypowiedzenie = undefined;
+              targetSpace.status = targetSpace.tenant ? 'occupied' : 'vacant';
+
+              await saveData(projects);
+              await loadRoom();
+              setWypowiedzenieDatesModalVisible(false);
+              setSelectedSpace(undefined);
+            } catch (error: any) {
+              Alert.alert('Błąd', error.message || 'Nie udało się anulować wypowiedzenia.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handlePutRoomOnWypowiedzenie = async () => {
     try {
       await putRoomOnWypowiedzenie(projectId, addressId, roomId);
@@ -376,7 +412,18 @@ export default function RoomDetailsScreen() {
 
       <Modal animationType="fade" transparent visible={spaceMenuVisible} onRequestClose={() => setSpaceMenuVisible(false)}>
         <Pressable className="flex-1 justify-center items-center bg-black/50" onPress={() => setSpaceMenuVisible(false)}>
-          <Pressable className="bg-card p-6 rounded-2xl w-11/12 max-w-sm">
+          <Pressable
+            className="p-6 rounded-2xl w-11/12 max-w-sm border border-border"
+            style={{
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              elevation: 12,
+              shadowColor: '#000',
+              shadowOpacity: 0.35,
+              shadowRadius: 18,
+              shadowOffset: { width: 0, height: 10 },
+            }}
+          >
             <Text className="text-lg font-bold text-foreground text-center mb-4">
               Miejsce {selectedSpace?.number}
             </Text>
@@ -397,7 +444,7 @@ export default function RoomDetailsScreen() {
                     className="flex-row items-center justify-center gap-3 py-3 bg-warning/20 rounded-xl mb-2"
                   >
                     <MaterialIcons name="event" size={24} color={colors.warning} />
-                    <Text className="text-warning font-medium">Zmień daty wypowiedzenia</Text>
+                    <Text className="text-warning font-medium">Zmień wypowiedzenie</Text>
                   </Pressable>
                 ) : (
                   <Pressable
@@ -444,12 +491,18 @@ export default function RoomDetailsScreen() {
 
       <Modal animationType="fade" transparent visible={wypowiedzenieDatesModalVisible} onRequestClose={() => setWypowiedzenieDatesModalVisible(false)}>
         <Pressable className="flex-1 justify-center items-center bg-black/50 p-4" onPress={() => setWypowiedzenieDatesModalVisible(false)}>
-          <Pressable className="bg-card p-6 rounded-2xl w-full max-w-sm gap-4">
+          <Pressable
+            className="p-6 rounded-2xl w-full max-w-sm gap-4 border border-border"
+            style={{ backgroundColor: colors.card, borderColor: colors.border, elevation: 12 }}
+          >
             <Text className="text-lg font-bold text-foreground text-center">Daty wypowiedzenia</Text>
             <DatePicker value={wypowiedzenieStartDate} onChange={setWypowiedzenieStartDate} label="Data rozpoczęcia" placeholder="Wybierz datę" />
             <DatePicker value={wypowiedzenieEndDate} onChange={setWypowiedzenieEndDate} label="Data zakończenia" placeholder="Wybierz datę" />
             <Pressable onPress={handleSaveWypowiedzenieDates} className="bg-primary py-3 rounded-xl items-center">
               <Text className="text-white font-semibold">Zapisz</Text>
+            </Pressable>
+            <Pressable onPress={handleCancelSpaceWypowiedzenie} className="bg-error/20 py-3 rounded-xl items-center">
+              <Text className="text-error font-semibold">Anuluj wypowiedzenie</Text>
             </Pressable>
           </Pressable>
         </Pressable>

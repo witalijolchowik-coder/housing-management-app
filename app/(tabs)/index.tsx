@@ -6,7 +6,6 @@ import { useState, useCallback } from 'react';
 import { ScreenContainer } from '@/components/screen-container';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ProgressBar } from '@/components/ui/progress-bar';
 import { FAB } from '@/components/ui/fab';
 import { ProjectMenuModal } from '@/components/project-menu-modal';
 import { ProjectFormModal } from '@/components/project-form-modal';
@@ -14,11 +13,67 @@ import { SettingsMenuModal } from '@/components/settings-menu-modal';
 import { useTranslations } from '@/hooks/use-translations';
 import { useColors } from '@/hooks/use-colors';
 import { Project, Conflict } from '@/types';
-import { loadData, calculateProjectStats, initializeDemoData, addProject, updateProject, deleteProject, getConflicts, saveData, updateProjectsOrder } from '@/lib/store';
+import { loadData, calculateProjectStats, initializeDemoData, addProject, updateProject, deleteProject, getConflicts, saveData, updateProjectsOrder, isSpacePaid } from '@/lib/store';
 import { parseCSV, groupCSVByAddress, findSimilarAddresses, importCSVIntoProject, AddressGroup } from '@/lib/csv-import';
 import { AddressMatchDialog } from '@/components/address-match-dialog';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+
+type ProjectPlaceStructure = {
+  total: number;
+  occupied: number;
+  occupiedNotice: number;
+  emptyNotice: number;
+  losses: number;
+  free: number;
+  occupiedTotal: number;
+  occupiedPercent: number;
+};
+
+const getProjectPlaceStructure = (project: Project): ProjectPlaceStructure => {
+  const structure = {
+    total: 0,
+    occupied: 0,
+    occupiedNotice: 0,
+    emptyNotice: 0,
+    losses: 0,
+    free: 0,
+    occupiedTotal: 0,
+    occupiedPercent: 0,
+  };
+
+  for (const address of project.addresses) {
+    for (const room of address.rooms) {
+      for (const space of room.spaces) {
+        structure.total += 1;
+        const hasTenant = Boolean(space.tenant);
+        const onNotice = space.status === 'wypowiedzenie' && Boolean(space.wypowiedzenie);
+        const paid = isSpacePaid(space);
+
+        if (hasTenant && space.status !== 'inactive') {
+          if (onNotice) {
+            structure.occupiedNotice += 1;
+          } else {
+            structure.occupied += 1;
+          }
+        } else if (onNotice && paid) {
+          structure.emptyNotice += 1;
+        } else if (!hasTenant && paid && space.status !== 'inactive') {
+          structure.losses += 1;
+        } else {
+          structure.free += 1;
+        }
+      }
+    }
+  }
+
+  structure.occupiedTotal = structure.occupied + structure.occupiedNotice;
+  structure.occupiedPercent = structure.total > 0
+    ? Math.round((structure.occupiedTotal / structure.total) * 100)
+    : 0;
+
+  return structure;
+};
 
 export default function DashboardScreen() {
   const t = useTranslations();
@@ -86,7 +141,7 @@ export default function DashboardScreen() {
 
     for (const project of projectsToCalculate) {
       const stats = calculateProjectStats(project);
-      totalSpaces += stats.paid;
+      totalSpaces += stats.total;
       totalOccupied += stats.occupied;
       totalVacant += stats.vacant;
       totalWypowiedzenie += stats.wypowiedzenie;
@@ -364,10 +419,10 @@ export default function DashboardScreen() {
               </Card>
             </Pressable>
 
-            <Pressable onPress={() => handleStatClick('conflicts')} className="flex-1">
+            <Pressable onPress={() => handleStatClick('vacant')} className="flex-1">
               <Card className="p-4 items-center border-error/40">
                 <MaterialIcons name="priority-high" size={24} color={colors.error} />
-                <Text className="text-xs text-muted mt-1">Bez wyp.</Text>
+                <Text className="text-xs text-muted mt-1">Straty</Text>
                 <Text className="text-xl font-bold text-foreground">{overallStats.unplannedPaidVacant}</Text>
               </Card>
             </Pressable>
@@ -395,8 +450,16 @@ export default function DashboardScreen() {
         ) : (
           projects.map((item, index) => {
             const stats = calculateProjectStats(item);
+            const placeStructure = getProjectPlaceStructure(item);
             const hasEvictions = stats.wypowiedzenie > 0;
             const hasConflicts = stats.conflictCount > 0;
+            const segments = [
+              { key: 'occupied', count: placeStructure.occupied, color: colors.success },
+              { key: 'occupiedNotice', count: placeStructure.occupiedNotice, color: colors.warning },
+              { key: 'emptyNotice', count: placeStructure.emptyNotice, color: '#FDE68A' },
+              { key: 'losses', count: placeStructure.losses, color: colors.error },
+              { key: 'free', count: placeStructure.free, color: '#4B5563' },
+            ].filter((segment) => segment.count > 0);
             const operators = new Set<string>();
             item.addresses.forEach(address => {
               if (address.supplierName) {
@@ -468,12 +531,46 @@ export default function DashboardScreen() {
 
                     <View className="gap-2">
                       <View className="flex-row justify-between items-center">
-                        <Text className="text-4xl font-bold text-primary">{stats.occupancyPercent}%</Text>
+                        <Text className="text-4xl font-bold text-primary">{placeStructure.occupiedPercent}%</Text>
                         <Text className="text-sm text-muted">
-                          {stats.occupied}/{stats.paid} {t.addressList.occupied}
+                          {placeStructure.occupiedTotal}/{placeStructure.total} {t.addressList.occupied}
                         </Text>
                       </View>
-                      <ProgressBar progress={stats.occupancyPercent} color="bg-primary" />
+                      <View
+                        className="h-3 rounded-full overflow-hidden flex-row bg-surfaceVariant"
+                        style={{ borderColor: colors.border, borderWidth: 1 }}
+                      >
+                        {segments.length > 0 ? (
+                          segments.map((segment) => (
+                            <View
+                              key={segment.key}
+                              style={{
+                                width: `${(segment.count / Math.max(placeStructure.total, 1)) * 100}%`,
+                                backgroundColor: segment.color,
+                              }}
+                            />
+                          ))
+                        ) : (
+                          <View className="flex-1" style={{ backgroundColor: colors.muted }} />
+                        )}
+                      </View>
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center gap-1">
+                          <View className="w-2 h-2 rounded-full" style={{ backgroundColor: colors.error }} />
+                          <Text className="text-xs text-muted">Straty</Text>
+                          <Text className="text-xs font-semibold text-foreground">{placeStructure.losses}</Text>
+                        </View>
+                        <View className="flex-row items-center gap-1">
+                          <View className="w-2 h-2 rounded-full" style={{ backgroundColor: '#FDE68A' }} />
+                          <Text className="text-xs text-muted">Wyp.</Text>
+                          <Text className="text-xs font-semibold text-foreground">{placeStructure.emptyNotice}</Text>
+                        </View>
+                        <View className="flex-row items-center gap-1">
+                          <View className="w-2 h-2 rounded-full" style={{ backgroundColor: '#4B5563' }} />
+                          <Text className="text-xs text-muted">Wolne</Text>
+                          <Text className="text-xs font-semibold text-foreground">{placeStructure.free}</Text>
+                        </View>
+                      </View>
                     </View>
 
                     <View className="flex-row flex-wrap gap-3 pt-2 border-t border-border/30">
