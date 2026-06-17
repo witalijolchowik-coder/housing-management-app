@@ -127,13 +127,11 @@ export default function DashboardScreen() {
     let totalOccupied = 0;
     let totalVacant = 0;
     let totalWypowiedzenie = 0;
+    let totalOccupiedNotice = 0;
     let totalAddresses = 0;
     let conflictCount = 0;
-    let paidVacant = 0;
     let unplannedPaidVacant = 0;
-    let noticePaidVacant = 0;
     let doWymeldowania = 0;
-    let vacantLoss = 0;
 
     const projectsToCalculate = activeProjectId 
       ? projects.filter(p => p.id === activeProjectId)
@@ -141,20 +139,19 @@ export default function DashboardScreen() {
 
     for (const project of projectsToCalculate) {
       const stats = calculateProjectStats(project);
-      totalSpaces += stats.total;
-      totalOccupied += stats.occupied;
-      totalVacant += stats.vacant;
-      totalWypowiedzenie += stats.wypowiedzenie;
+      const placeStructure = getProjectPlaceStructure(project);
+      totalSpaces += placeStructure.total;
+      totalOccupied += placeStructure.occupiedTotal;
+      totalVacant += placeStructure.free;
+      totalWypowiedzenie += placeStructure.emptyNotice;
+      totalOccupiedNotice += placeStructure.occupiedNotice;
       totalAddresses += project.addresses.length;
       conflictCount += stats.conflictCount;
-      paidVacant += stats.paidVacant;
-      unplannedPaidVacant += stats.unplannedPaidVacant;
-      noticePaidVacant += stats.noticePaidVacant;
+      unplannedPaidVacant += placeStructure.losses;
       doWymeldowania += stats.doWymeldowania;
-      vacantLoss += stats.vacantLoss;
     }
 
-    return { totalSpaces, totalOccupied, totalVacant, totalWypowiedzenie, totalAddresses, conflictCount, paidVacant, unplannedPaidVacant, noticePaidVacant, doWymeldowania, vacantLoss };
+    return { totalSpaces, totalOccupied, totalVacant, totalWypowiedzenie, totalOccupiedNotice, totalAddresses, conflictCount, unplannedPaidVacant, doWymeldowania };
   };
 
   const handleProjectPress = (projectId: string) => {
@@ -362,7 +359,7 @@ export default function DashboardScreen() {
             <Pressable onPress={() => handleStatClick('lokale')} className="flex-1">
               <Card className="p-4 items-center">
                 <MaterialIcons name="apartment" size={24} color={colors.primary} />
-                <Text className="text-xs text-muted mt-1">Lokali</Text>
+                <Text className="text-xs text-muted mt-1">Lokale</Text>
                 <Text className="text-xl font-bold text-foreground">{overallStats.totalAddresses}</Text>
               </Card>
             </Pressable>
@@ -387,7 +384,7 @@ export default function DashboardScreen() {
           <View className="flex-row gap-3">
             <Pressable onPress={() => handleStatClick('vacant')} className="flex-1">
               <Card className="p-4 items-center">
-                <MaterialIcons name="event-available" size={24} color={colors.warning} />
+                <MaterialIcons name="hotel" size={24} color={colors.muted} />
                 <Text className="text-xs text-muted mt-1">Wolne</Text>
                 <Text className="text-xl font-bold text-foreground">{overallStats.totalVacant}</Text>
               </Card>
@@ -396,26 +393,26 @@ export default function DashboardScreen() {
             <Pressable onPress={() => handleStatClick('wypowiedzenie')} className="flex-1">
               <Card className="p-4 items-center">
                 <MaterialIcons name="warning" size={24} color={colors.warning} />
-                <Text className="text-xs text-muted mt-1">Wyp.</Text>
+                <Text className="text-xs text-muted mt-1">Wypowiedzenia</Text>
                 <Text className="text-xl font-bold text-foreground">{overallStats.totalWypowiedzenie}</Text>
               </Card>
             </Pressable>
 
-            <Pressable onPress={() => handleStatClick('conflicts')} className="flex-1">
+            <Pressable onPress={() => handleStatClick('wypowiedzenie')} className="flex-1">
               <Card className="p-4 items-center">
-                <MaterialIcons name="error" size={24} color={colors.error} />
-                <Text className="text-xs text-muted mt-1">Konflikty</Text>
-                <Text className="text-xl font-bold text-foreground">{overallStats.conflictCount}</Text>
+                <MaterialIcons name="person" size={24} color={colors.warning} />
+                <Text className="text-xs text-muted mt-1">Zajęte wyp.</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.totalOccupiedNotice}</Text>
               </Card>
             </Pressable>
           </View>
 
           <View className="flex-row gap-3 mt-3">
-            <Pressable onPress={() => handleStatClick('vacant')} className="flex-1">
-              <Card className="p-4 items-center border-warning/40">
-                <MaterialIcons name="payments" size={24} color={colors.warning} />
-                <Text className="text-xs text-muted mt-1">Puste opł.</Text>
-                <Text className="text-xl font-bold text-foreground">{overallStats.paidVacant}</Text>
+            <Pressable onPress={() => handleStatClick('conflicts')} className="flex-1">
+              <Card className="p-4 items-center">
+                <MaterialIcons name="error" size={24} color={colors.error} />
+                <Text className="text-xs text-muted mt-1">Konflikty</Text>
+                <Text className="text-xl font-bold text-foreground">{overallStats.conflictCount}</Text>
               </Card>
             </Pressable>
 
@@ -430,7 +427,7 @@ export default function DashboardScreen() {
             <Pressable onPress={() => handleStatClick('conflicts')} className="flex-1">
               <Card className="p-4 items-center border-warning/40">
                 <MaterialIcons name="person-off" size={24} color={colors.warning} />
-                <Text className="text-xs text-muted mt-1">Do wym.</Text>
+                <Text className="text-xs text-muted mt-1">Do wymeldowania</Text>
                 <Text className="text-xl font-bold text-foreground">{overallStats.doWymeldowania}</Text>
               </Card>
             </Pressable>
